@@ -330,8 +330,35 @@ const ADMIN_USERS = ['nitty1', 'nitty']; // ← впиши свой ник сю�
 let currentUser = null;
 let card = null;
 
-function getUsers() { return JSON.parse(localStorage.getItem('vaultUsers') || '{}'); }
-function saveUsers(u) { localStorage.setItem('vaultUsers', JSON.stringify(u)); }
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC25opJgTxCJacH1r2gS9iaqfYHjGzADus",
+    authDomain: "nitty-casino.firebaseapp.com",
+    projectId: "nitty-casino",
+    storageBucket: "nitty-casino.firebasestorage.app",
+    messagingSenderId: "609501277778",
+    appId: "1:609501277778:web:56871266b5a9a39cf7798b",
+    measurementId: "G-XP8ZLV0GR1"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  function saveUserToCloud(username, userData) {
+    set(ref(db, 'users/' + username), userData);
+  }
+
+  const usersRef = ref(db, 'users');
+  onValue(usersRef, (snapshot) => {
+    const users = snapshot.val() || {};
+    
+    console.log("Global players list updated:", users);
+    
+  });
+</script>
 
 // ── AUTH ──────────────────────────────────────
 function switchTab(tab) {
