@@ -2,7 +2,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
 <script>
-  // Your exact Firebase configuration
+  // Ваша конфигурация Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyC25opJgTxCJacH1r2gS9iaqfYHjGzADus",
     authDomain: "nitty-casino.firebaseapp.com",
@@ -13,297 +13,287 @@
     measurementId: "G-XP8ZLV0GR1"
   };
 
+  // Инициализация Firebase
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  let currentUser = localStorage.getItem('vaultRemember') || null;
-  let balance = 0;
-  let userData = {};
+  const ADMIN_USERS = ['admin', 'owner', 'Nitty'];
+  let currentUser = null;
 
-  // Watch profile changes live across slots and rooms
-  if (currentUser) {
-    db.ref(`vaultUsers/${currentUser}`).on('value', (snapshot) => {
-      userData = snapshot.val() || {};
-      balance = parseFloat(userData.balance || 0);
-      document.getElementById('topBalanceDisplay').textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
+  // Функция для получения всех пользователей (теперь из Firebase)
+  function getUsers(callback) {
+    db.ref('vaultUsers').once('value', (snapshot) => {
+      callback(snapshot.val() || {});
     });
-  } else {
-    alert("Please log into Vault Bank first to fetch your casino credit parameters!");
-    window.location.href = "./index.html";
   }
 
-  // --- Core Game Variables ---
-  let deck = [];
-  let playerHand = [];
-  let dealerHand = [];
-  let currentBet = 0;
-  let gameActive = false;
-
-  const SUITS = ['♠', '♥', '♦', '♣'];
-  const VALUES = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-
-  function buildDeck() {
-    deck = [];
-    for (let s of SUITS) {
-      for (let v of VALUES) {
-        deck.push({ suit: s, value: v });
-      }
-    }
-    // Shuffle
-    for (let i = deck.length - 1; i > 0; i--) {
-      let j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
+  // Функция сохранения (теперь в Firebase)
+  function saveUsers(users, callback) {
+    db.ref('vaultUsers').set(users, () => {
+      if (callback) callback();
+    });
   }
 
-  function getCardValue(card) {
-    if (['J', 'Q', 'K'].includes(card.value)) return 10;
-    if (card.value === 'A') return 11;
-    return parseInt(card.value);
-  }
-
-  function getHandScore(hand) {
-    let score = 0;
-    let aces = 0;
-    for (let c of hand) {
-      score += getCardValue(c);
-      if (c.value === 'A') aces++;
-    }
-    while (score > 21 && aces > 0) {
-      score -= 10;
-      aces--;
-    }
-    return score;
-  }
-
-  function addBet(amt) {
-    if (gameActive) return;
-    if (balance < amt) { showToast("Insufficient Bank Vault balance."); return; }
+  // --- Реальное время: следим за базой данных ---
+  db.ref('vaultUsers').on('value', (snapshot) => {
+    const users = snapshot.val() || {};
+    adminRefreshUsers(); // Обновляем список админа при любых изменениях
     
-    currentBet += amt;
-    // Fast subtract locally to give game feedback before resolving on backend database
-    balance -= amt;
-    document.getElementById('betDisplayAmt').textContent = currentBet;
-    document.getElementById('topBalanceDisplay').textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
-    setBtns(currentBet > 0);
-  }
-
-  function clearBet() {
-    if (gameActive) return;
-    // Revert local view
-    balance += currentBet;
-    currentBet = 0;
-    document.getElementById('betDisplayAmt').textContent = '0';
-    document.getElementById('topBalanceDisplay').textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
-    setBtns(false);
-  }
-
-  function setBtns(canDeal) {
-    document.getElementById('btn-deal').disabled = gameActive || !canDeal;
-    document.getElementById('btn-hit').disabled = !gameActive;
-    document.getElementById('btn-stand').disabled = !gameActive;
-    document.getElementById('btn-double').disabled = !gameActive || playerHand.length !== 2;
-    document.getElementById('btn-clear').disabled = gameActive || currentBet === 0;
-  }
-
-  function startDeal() {
-    if (gameActive || currentBet === 0) return;
-    
-    // Deduct transaction formally from Cloud Database
-    const currentHistory = userData.history || [];
-    currentHistory.unshift({
-      desc: `Blackjack Bet: -${currentBet}`,
-      amt: currentBet,
-      type: "neg",
-      date: new Date().toLocaleString()
-    });
-
-    db.ref(`vaultUsers/${currentUser}`).update({
-      balance: balance, // Already deducted locally in addBet
-      history: currentHistory
-    }).then(() => {
-      gameActive = true;
-      buildDeck();
-      playerHand = [deck.pop(), deck.pop()];
-      dealerHand = [deck.pop(), deck.pop()];
-
-      renderHands(false);
-      setBtns(true);
-      document.getElementById('resultText').className = 'result-banner';
-      document.getElementById('resultText').textContent = '';
-
-      if (getHandScore(playerHand) === 21) {
-        standGame();
-      }
-    });
-  }
-
-  function renderHands(showAllDealer) {
-    const pRow = document.getElementById('playerCardRow');
-    const dRow = document.getElementById('dealerCardRow');
-
-    pRow.innerHTML = playerHand.map(c => makeCardHTML(c, false)).join('');
-    dRow.innerHTML = dealerHand.map((c, idx) => makeCardHTML(c, idx === 1 && !showAllDealer)).join('');
-
-    // Trigger dealt animations
-    setTimeout(() => {
-      document.querySelectorAll('.card-el').forEach(el => el.classList.add('dealt'));
-    }, 50);
-
-    document.getElementById('pScore').textContent = getHandScore(playerHand);
-    document.getElementById('dScore').textContent = showAllDealer ? getHandScore(dealerHand) : getCardValue(dealerHand[0]);
-  }
-
-  function makeCardHTML(card, isBack) {
-    if (isBack) return `<div class="card-el back"></div>`;
-    const isRed = ['♥', '♦'].includes(card.suit) ? 'red' : '';
-    return `
-      <div class="card-el ${isRed}">
-        <div class="card-corner tl"><div>${card.value}</div><div>${card.suit}</div></div>
-        <div class="card-suit-big">${card.suit}</div>
-        <div class="card-corner br"><div>${card.value}</div><div>${card.suit}</div></div>
-      </div>`;
-  }
-
-  function hitCard() {
-    if (!gameActive) return;
-    playerHand.push(deck.pop());
-    renderHands(false);
-    
-    if (getHandScore(playerHand) > 21) {
-      endGame('lose', 'Busted! Dealer wins.');
-    }
-    setBtns(true);
-  }
-
-  function doubleDown() {
-    if (!gameActive || playerHand.length !== 2) return;
-    if (balance < currentBet) { showToast("Insufficient balance for double down optimization."); return; }
-
-    const structuralBet = currentBet;
-    balance -= structuralBet;
-    currentBet += structuralBet;
-
-    document.getElementById('betDisplayAmt').textContent = currentBet;
-    playerHand.push(deck.pop());
-    renderHands(false);
-
-    if (getHandScore(playerHand) > 21) {
-      const currentHistory = userData.history || [];
-      currentHistory.unshift({ desc: `BJ Double Loss`, amt: structuralBet, type: "neg", date: new Date().toLocaleString() });
-      db.ref(`vaultUsers/${currentUser}`).update({ balance: balance, history: currentHistory });
-      endGame('lose', 'Busted on Double Down!');
-    } else {
-      standGame(structuralBet);
-    }
-  }
-
-  function standGame(extraDoubleAdded = 0) {
-    if (!gameActive) return;
-    renderHands(true);
-
-    let dScore = getHandScore(dealerHand);
-    while (dScore < 17) {
-      dealerHand.push(deck.pop());
-      dScore = getHandScore(dealerHand);
-    }
-    renderHands(true);
-
-    const pScore = getHandScore(playerHand);
-    let result = '';
-    let msg = '';
-    let payoutFactor = 0;
-
-    if (dScore > 21) {
-      result = 'win'; msg = 'Dealer Busted! You win!'; payoutFactor = 2;
-    } else if (pScore > dScore) {
-      result = 'win'; msg = 'You win!'; payoutFactor = 2;
-    } else if (pScore < dScore) {
-      result = 'lose'; msg = 'Dealer wins.'; payoutFactor = 0;
-    } else {
-      result = 'push'; msg = 'Push!'; payoutFactor = 1;
-    }
-
-    // Checking for Natural Blackjack premium payout configuration
-    if (pScore === 21 && playerHand.length === 2 && result === 'win') {
-      payoutFactor = 2.5;
-      msg = 'Natural Blackjack payout executed!';
-    }
-
-    const netWinAmount = currentBet * payoutFactor;
-    const finalBalance = balance + netWinAmount;
-
-    const currentHistory = userData.history || [];
-    if (extraDoubleAdded > 0 && result === 'lose') {
-      currentHistory.unshift({ desc: `BJ Double Loss`, amt: extraDoubleAdded, type: "neg", date: new Date().toLocaleString() });
-    }
-    if (netWinAmount > 0) {
-      currentHistory.unshift({
-        desc: `BJ Return (${msg})`,
-        amt: netWinAmount,
-        type: "pos",
-        date: new Date().toLocaleString()
-      });
-    }
-
-    db.ref(`vaultUsers/${currentUser}`).update({
-      balance: finalBalance,
-      history: currentHistory
-    }).then(() => {
-      if (result === 'win') confetti();
-      currentBet = 0;
-      document.getElementById('betDisplayAmt').textContent = '0';
-      endGame(result, msg);
-    });
-  }
-
-  function endGame(status, msg) {
-    gameActive = false;
-    const banner = document.getElementById('resultText');
-    banner.textContent = msg;
-    banner.className = `result-banner show ${status}`;
-    setBtns(false);
-  }
-
-  // --- Secret Developer Backdoor Panel ---
-  const SECRET = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','b','a'];
-  let secretIdx = 0;
-  document.addEventListener('keydown', e => {
-    if (e.key === SECRET[secretIdx]) {
-      secretIdx++;
-      if (secretIdx === SECRET.length) {
-        secretIdx = 0;
-        document.getElementById('adminPanel').style.display = 'block';
-        showToast('System Admin Mode Granted.');
-      }
-    } else {
-      secretIdx = e.key === SECRET[0] ? 1 : 0;
+    if (currentUser && users[currentUser]) {
+      updateUI(users[currentUser]);
     }
   });
 
-  function addAdminCredits() {
-    const amt = parseFloat(document.getElementById('adminAmt').value);
-    if (!amt || amt <= 0) return;
+  function switchTab(tab) {
+    document.getElementById('tabLogin').style.background = tab === 'login' ? '#c9a84c' : 'transparent';
+    document.getElementById('tabLogin').style.color = tab === 'login' ? '#0c0c0e' : '#7a7870';
+    document.getElementById('tabRegister').style.background = tab === 'register' ? '#c9a84c' : 'transparent';
+    document.getElementById('tabRegister').style.color = tab === 'register' ? '#0c0c0e' : '#7a7870';
+    document.getElementById('auth-title').textContent = tab === 'login' ? 'LOGIN' : 'CREATE ACCOUNT';
+    document.getElementById('auth-btn').textContent = tab === 'login' ? 'ACCESS VAULT' : 'REGISTER ACCOUNT';
+  }
 
-    const currentHistory = userData.history || [];
-    currentHistory.unshift({ desc: "Admin Casino Mint", amt: amt, type: "pos", date: new Date().toLocaleString() });
+  function handleAuth() {
+    const user = document.getElementById('auth-username').value.trim();
+    const pin = document.getElementById('auth-pin').value.trim();
+    const errorEl = document.getElementById('auth-error');
 
-    db.ref(`vaultUsers/${currentUser}`).update({
-      balance: balance + amt,
-      history: currentHistory
-    }).then(() => {
-      showToast(`⚡ +$${amt.toFixed(2)} minted safely into database vault.`);
-      document.getElementById('adminAmt').value = '';
+    if (!user || !pin) {
+      errorEl.textContent = "Please fill in all fields.";
+      return;
+    }
+
+    const isRegistering = document.getElementById('auth-btn').textContent.includes('REGISTER');
+
+    getUsers((users) => {
+      if (isRegistering) {
+        if (users[user]) {
+          errorEl.textContent = "Account nickname already exists.";
+          return;
+        }
+        const newUser = {
+          pin: pin,
+          balance: 1000.00,
+          accountNumber: "VLT-" + Math.floor(100000 + Math.random() * 900000),
+          cvv: Math.floor(100 + Math.random() * 900),
+          expiry: "12/31",
+          history: [{desc: "Account Activated", amt: 1000.00, type: "pos", date: new Date().toLocaleString()}]
+        };
+        users[user] = newUser;
+        saveUsers(users, () => {
+          loginAs(user, newUser);
+        });
+      } else {
+        if (users[user] && users[user].pin === pin) {
+          loginAs(user, users[user]);
+        } else {
+          errorEl.textContent = "Invalid account reference or security PIN.";
+        }
+      }
     });
   }
 
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2800);
+  function loginAs(username, data) {
+    currentUser = username;
+    localStorage.setItem('vaultRemember', username);
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('user-tag').textContent = username.toUpperCase();
+    
+    if (ADMIN_USERS.includes(username)) {
+      document.getElementById('adminBadge').style.display = 'inline-block';
+      document.getElementById('adminPanelContainer').style.display = 'block';
+    } else {
+      document.getElementById('adminBadge').style.display = 'none';
+      document.getElementById('adminPanelContainer').style.display = 'none';
+    }
+    updateUI(data);
+    showToast(`Welcome back, ${username}`);
   }
 
-  buildDeck();
-  setBtns(false);
+  function logout() {
+    currentUser = null;
+    localStorage.removeItem('vaultRemember');
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-pin').value = '';
+    document.getElementById('auth-error').textContent = '';
+  }
+
+  function updateUI(data) {
+    document.getElementById('displayBalance').textContent = parseFloat(data.balance).toLocaleString('en-US', {minimumFractionDigits: 2});
+    document.getElementById('cardNum').textContent = data.accountNumber.replace(/(.{4})/g, '$1 ');
+    document.getElementById('cardHolder').textContent = currentUser.toUpperCase();
+    document.getElementById('cardExp').textContent = data.expiry;
+    document.getElementById('cardCvv').textContent = data.cvv;
+
+    const txList = document.getElementById('txList');
+    if (!data.history || data.history.length === 0) {
+      txList.innerHTML = '<div class="tx-item"><div class="tx-desc">No transaction records found.</div></div>';
+      return;
+    }
+    
+    txList.innerHTML = data.history.map(tx => `
+      <div class="tx-item">
+        <div class="tx-left">
+          <div class="tx-icon" style="background:${tx.type === 'pos' ? 'rgba(39,174,96,0.1)' : 'rgba(192,57,43,0.1)'}; color:${tx.type === 'pos' ? 'var(--green)' : 'var(--red)'}">
+            ${tx.type === 'pos' ? '↓' : '↑'}
+          </div>
+          <div>
+            <div class="tx-desc">${tx.desc}</div>
+            <div class="tx-date">${tx.date}</div>
+          </div>
+        </div>
+        <div class="tx-amount ${tx.type}">${tx.type === 'pos' ? '+' : '-'}$${parseFloat(Math.abs(tx.amt)).toFixed(2)}</div>
+      </div>
+    `).join('');
+  }
+
+  function handleWireTransfer() {
+    const target = document.getElementById('wire-target').value.trim();
+    const amount = parseFloat(document.getElementById('wire-amount').value);
+
+    if (!target || !amount || amount <= 0) {
+      showToast("Please provide valid transfer references.");
+      return;
+    }
+    if (target === currentUser) {
+      showToast("Cannot wire credits to yourself.");
+      return;
+    }
+
+    getUsers((users) => {
+      if (!users[target]) {
+        showToast("Target client registry not found.");
+        return;
+      }
+
+      const myData = users[currentUser];
+      if (myData.balance < amount) {
+        showToast("Insufficient vault limits available.");
+        return;
+      }
+
+      const timeString = new Date().toLocaleString();
+      
+      myData.history = myData.history || [];
+      myData.history.unshift({ desc: `Wire to ${target}`, amt: amount, type: "neg", date: timeString });
+      myData.balance -= amount;
+      
+      const targetData = users[target];
+      targetData.history = targetData.history || [];
+      targetHistory = targetData.history;
+      targetHistory.unshift({ desc: `Wire from ${currentUser}`, amt: amount, type: "pos", date: timeString });
+      targetData.balance += amount;
+
+      saveUsers(users, () => {
+        showToast(`Successfully wired $${amount.toFixed(2)} to ${target}`);
+        document.getElementById('wire-target').value = '';
+        document.getElementById('wire-amount').value = '';
+      });
+    });
+  }
+
+  // --- Админ-панель банка ---
+  function adminAdjustBalance() {
+    const username = document.getElementById('admin-target-user').value.trim();
+    const amount = parseFloat(document.getElementById('admin-amount-adjust').value);
+
+    if (!username || isNaN(amount)) {
+      showToast("Invalid admin command credentials.");
+      return;
+    }
+
+    getUsers((users) => {
+      if (!users[username]) {
+        showToast("Target client entry not found.");
+        return;
+      }
+
+      users[username].balance = (parseFloat(users[username].balance) || 0) + amount;
+      users[username].history = users[username].history || [];
+      users[username].history.unshift({
+        desc: "System Admin Adjustment",
+        amt: Math.abs(amount),
+        type: amount >= 0 ? "pos" : "neg",
+        date: new Date().toLocaleString()
+      });
+
+      saveUsers(users, () => {
+        showToast(`Adjusted balance for ${username} by $${amount.toFixed(2)}`);
+        document.getElementById('admin-target-user').value = '';
+        document.getElementById('admin-amount-adjust').value = '';
+      });
+    });
+  }
+
+  function adminDeleteUser() {
+    const username = document.getElementById('admin-target-user').value.trim();
+    if (!username) {
+      showToast("Target client entry not found.");
+      return;
+    }
+    if (username === currentUser) {
+      showToast("Cannot delete your own supervisor terminal.");
+      return;
+    }
+
+    if (!confirm(`Permanently erase ${username} from database?`)) return;
+
+    getUsers((users) => {
+      if (!users[username]) {
+        showToast("Target client entry not found.");
+        return;
+      }
+      delete users[username];
+      saveUsers(users, () => {
+        showToast(`Client account "${username}" erased.`);
+        document.getElementById('admin-target-user').value = '';
+      });
+    });
+  }
+
+  function adminRefreshUsers() {
+    const el = document.getElementById('adminUserList');
+    if (!el) return;
+    
+    getUsers((users) => {
+      const list = Object.keys(users);
+      if (!list.length) { el.textContent = 'No records active'; return; }
+      
+      el.innerHTML = list.map(u => {
+        const bal = parseFloat(users[u].balance || 0).toLocaleString('en-US', {minimumFractionDigits:2});
+        const isAdm = ADMIN_USERS.includes(u) ? ' 👑' : '';
+        return `
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,56,0.4);">
+            <span style="color:var(--text)">${u}${isAdm}</span>
+            <span style="color:var(--gold)">$${bal}</span>
+          </div>`;
+      }).join('');
+    });
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+  }
+  
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (t) {
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+  }
+
+  // Проверка сохраненной сессии при загрузке
+  const remembered = localStorage.getItem('vaultRemember');
+  if (remembered) {
+    setTimeout(() => {
+      getUsers((users) => {
+        if (users[remembered]) {
+          loginAs(remembered, users[remembered]);
+        }
+      });
+    }, 1000);
+  }
 </script>
