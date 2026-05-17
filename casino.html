@@ -1,3 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS Casino — Blackjack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --bg: #080c08;
+      --felt: #0f4d2a;
+      --felt2: #0d4225;
+      --felt-dark: #09301a;
+      --gold: #c9a84c;
+      --gold-light: #e8c96a;
+      --gold-dim: #6b5520;
+      --text: #f0ead8;
+      --text-dim: #7a7060;
+      --border: #1e3020;
+      --chip-red: #c0392b;
+      --chip-blue: #1a5276;
+      --chip-green: #1e8449;
+      --chip-black: #1a1a1a;
+      --chip-purple: #6c3483;
+      --chip-orange: #d35400;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; min-height: 100vh; overflow-x: hidden; }
+
+    body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:9999; opacity:0.5; }
+
+    header {
+      background: rgba(5,8,5,0.97);
+      border-bottom: 1px solid var(--gold-dim);
+      padding: 0 40px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      backdrop-filter: blur(12px);
+    }
+    .logo { font-family:'Cormorant Garamond',serif; font-size:30px; font-weight:600; color:var(--gold); letter-spacing:4px; }
+    .logo span { font-size:11px; color:var(--text-dim); letter-spacing:5px; display:block; margin-top:-4px; font-family:'Outfit',sans-serif; font-weight:300; }
+    .header-balance { display:flex; align-items:center; gap:20px; }
+    .hbal-label { font-size:11px; color:var(--text-dim); letter-spacing:2px; text-align:right; }
+    .hbal-amount { font-family:'DM Mono',monospace; font-size:24px; color:var(--gold-light); font-weight:500; }
+    .btn-deposit {
+      background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+      color: #080c08;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-left: 5px;
+    }
+    .btn-deposit:hover { filter:brightness(1.1); }
+
+    .table-wrap {
+      min-height: calc(100vh - 70px);
+      background:
+        radial-gradient(ellipse at 50% 0%, #1a5c30 0%, #0f4d2a 40%, #09301a 80%, #050e07 100%);
+      position: relative;
+      padding: 0 20px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .table-oval {
+      width: 95%;
+      max-width: 1000px;
+      border: 3px solid var(--gold-dim);
+      border-radius: 300px 300px 0 0;
+      padding: 30px 40px 0;
+      position: relative;
+      box-shadow: 0 0 60px rgba(0,0,0,0.5), inset 0 0 80px rgba(0,0,0,0.2);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .table-oval::before {
+      content: '';
+      position: absolute;
+      inset: 6px;
+      border-radius: 290px 290px 0 0;
+      border: 1px solid rgba(201,168,76,0.15);
+      pointer-events: none;
+    }
+
+    .dealer-area {
+      text-align: center;
+      padding: 20px 0 10px;
+    }
+    .zone-label {
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: rgba(201,168,76,0.4);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      font-weight: 300;
+    }
+    .hand-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      min-height: 140px;
+      align-items: center;
+    }
+    .score-badge {
+      display: inline-block;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid var(--gold-dim);
+      color: var(--gold-light);
+      font-family: 'DM Mono', monospace;
+      font-size: 20px;
+      font-weight: 500;
+      padding: 4px 18px;
+      border-radius: 20px;
+      margin-top: 10px;
+    }
+
+    .card-el {
+      width: 82px;
+      height: 120px;
+      background: #fff;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3);
+      border: 1px solid #ddd;
+      transform: scale(0.3) rotate(20deg);
+      opacity: 0;
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+      color: #1a1a1a;
+      cursor: default;
+      user-select: none;
+    }
+    .card-el.red { color: #c0392b; }
+    .card-el.dealt { transform: scale(1) rotate(0deg); opacity: 1; }
+    .card-el.back {
+      background: linear-gradient(135deg, #0d3b6e, #1a5276);
+      border: 2px solid #1a5276;
+      color: transparent;
+    }
+    .card-el.back::after {
+      content: '';
+      position: absolute;
+      inset: 5px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.04) 4px, rgba(255,255,255,0.04) 8px);
+    }
+    .card-corner { position:absolute; font-size:11px; font-weight:700; line-height:1; }
+    .card-corner.tl { top:5px; left:7px; text-align:left; }
+    .card-corner.br { bottom:5px; right:7px; transform:rotate(180deg); }
+    .card-suit-big { font-size:36px; }
+
+    .table-center {
+      border-top: 1px solid rgba(201,168,76,0.15);
+      border-bottom: 1px solid rgba(201,168,76,0.15);
+      text-align: center;
+      padding: 14px;
+      margin: 10px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+    .nexus-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      color: rgba(201,168,76,0.25);
+      letter-spacing: 8px;
+      text-transform: uppercase;
+    }
+    .result-banner {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--gold-light);
+      text-shadow: 0 0 30px rgba(201,168,76,0.5);
+      letter-spacing: 3px;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    .result-banner.show { opacity: 1; }
+    .result-banner.win { color: #2ecc71; text-shadow: 0 0 20px rgba(46,204,113,0.5); }
+    .result-banner.lose { color: #e74c3c; text-shadow: 0 0 20px rgba(231,76,60,0.5); }
+    .result-banner.push { color: var(--gold-light); }
+
+    .player-area { text-align: center; padding: 10px 0 20px; }
+
+    .bet-zone {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      min-height: 70px;
+      margin: 12px 0;
+    }
+    .bet-chips {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      min-width: 120px;
+      min-height: 60px;
+      gap: -4px;
+      position: relative;
+    }
+    .stacked-chip {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-weight: 700;
+      font-size: 11px;
+      color: #fff;
+      border: 3px solid rgba(255,255,255,0.3);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .bet-amount-display {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      color: var(--gold-light);
+      min-width: 80px;
+      text-align: center;
+    }
+    .bet-amount-label { font-size: 11px; color: var(--text-dim); letter-spacing: 2px; }
+
+    .chip-tray {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 16px 0 8px;
+    }
+    .chip {
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-weight: 700;
+      font-size: 13px;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      user-select: none;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6), inset 0 2px 0 rgba(255,255,255,0.2), inset 0 -2px 0 rgba(0,0,0,0.3);
+    }
+    .chip::before {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      border: 2px dashed rgba(255,255,255,0.25);
+    }
+    .chip:hover { transform: translateY(-4px) scale(1.05); box-shadow: 0 8px 20px rgba(0,0,0,0.7), inset 0 2px 0 rgba(255,255,255,0.2); }
+    .chip:active { transform: translateY(0) scale(0.97); }
+    .chip.c1 { background: radial-gradient(circle, #e8e8e8, #aaa); color: #333; }
+    .chip.c5 { background: radial-gradient(circle, #e74c3c, #922b21); }
+    .chip.c10 { background: radial-gradient(circle, #2980b9, #1a5276); }
+    .chip.c25 { background: radial-gradient(circle, #27ae60, #1e8449); }
+    .chip.c50 { background: radial-gradient(circle, #8e44ad, #6c3483); }
+    .chip.c100 { background: radial-gradient(circle, #e67e22, #ca6f1e); }
+    .chip.c500 { background: radial-gradient(circle, #1a1a1a, #333); border: 3px solid var(--gold-dim); }
+	.chip.c1k { background: radial-gradient(circle, #f1c40f, #bc950e); color: #000; font-weight: bold; border: 2px solid #fff; }
+	.chip.c5k { background: radial-gradient(circle, #9b59b6, #6c3483); border: 2px solid #fff; }
+	.chip.c10k { background: radial-gradient(circle, #111111, #2c3e50); color: var(--gold-light); font-weight: bold; border: 3px solid var(--gold); box-shadow: 0 0 12px rgba(201,168,76,0.6); }
+    .chip[disabled] { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+    .action-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 14px 0;
+      flex-wrap: wrap;
+    }
+    .action-btn {
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 1px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+    }
+    .action-btn:hover:not([disabled]) { filter: brightness(1.15); transform: translateY(-2px); }
+    .action-btn:active:not([disabled]) { transform: translateY(0); }
+    .action-btn[disabled] { opacity: 0.3; cursor: not-allowed; }
+    .btn-deal { background: linear-gradient(135deg, var(--gold-dim), var(--gold)); color: #080c08; font-size: 16px; padding: 14px 44px; }
+    .btn-hit { background: #27ae60; color: #fff; }
+    .btn-stand { background: #c0392b; color: #fff; }
+    .btn-double { background: #e67e22; color: #fff; }
+    .btn-clear { background: rgba(255,255,255,0.08); color: var(--text-dim); border: 1px solid var(--border); }
+
+    .count-display {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid var(--gold-dim);
+      border-radius: 10px;
+      padding: 10px 16px;
+      text-align: center;
+    }
+    .count-label { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; }
+    .count-num { font-family: 'DM Mono', monospace; font-size: 22px; color: var(--gold-light); }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      backdrop-filter: blur(6px);
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: #0d1210;
+      border: 1px solid var(--gold-dim);
+      border-radius: 20px;
+      padding: 36px;
+      width: 440px;
+      max-width: 95vw;
+      transform: translateY(20px);
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-title { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:600; color:var(--gold); margin-bottom:6px; }
+    .modal-sub { font-size:12px; color:var(--text-dim); letter-spacing:1px; margin-bottom:28px; }
+    .modal-input {
+      width:100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      outline: none;
+      margin-bottom: 14px;
+      transition: border-color 0.2s;
+      letter-spacing: 2px;
+    }
+    .modal-input:focus { border-color: var(--gold-dim); }
+    .modal-input::placeholder { letter-spacing: 1px; color: #444; }
+    .modal-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+      color: #080c08;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    .modal-btn:hover { filter: brightness(1.1); }
+    .modal-close { position:absolute; top:16px; right:20px; background:none; border:none; color:var(--text-dim); font-size:22px; cursor:pointer; }
+    .modal-error { color:#e74c3c; font-size:13px; margin-top:-6px; margin-bottom:10px; }
+
+    .admin-panel {
+      background: rgba(201,168,76,0.05);
+      border: 1px solid var(--gold-dim);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .admin-title { font-size:12px; letter-spacing:3px; color:var(--gold); margin-bottom:14px; }
+
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(10,14,10,0.95);
+      border: 1px solid var(--gold-dim);
+      color: var(--text);
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 600;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    .history-strip {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      padding: 10px 0;
+      flex-wrap: wrap;
+    }
+    .hist-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    .hist-dot.w { background: rgba(46,204,113,0.3); color: #2ecc71; border: 1px solid #2ecc71; }
+    .hist-dot.l { background: rgba(231,76,60,0.3); color: #e74c3c; border: 1px solid #e74c3c; }
+    .hist-dot.p { background: rgba(201,168,76,0.2); color: var(--gold); border: 1px solid var(--gold-dim); }
+  </style>
+</head>
+<body>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="position:fixed;inset:0;background:#080c08;z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#0d1210;border:1px solid #6b5520;border-radius:20px;padding:40px;width:400px;max-width:95vw;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:30px;color:#c9a84c;letter-spacing:4px;margin-bottom:6px;">NEXUS</div>
+    <div style="font-size:12px;color:#7a7060;letter-spacing:3px;margin-bottom:30px;">CASINO · PRIVATE TABLE</div>
+    <input id="c-username" placeholder="Username" style="width:100%;background:#1a1a10;border:1px solid #2a2a18;color:#f0ead8;padding:12px 16px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;outline:none;margin-bottom:12px;display:block;">
+    <input id="c-password" type="password" placeholder="Password" style="width:100%;background:#1a1a10;border:1px solid #2a2a18;color:#f0ead8;padding:12px 16px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;outline:none;margin-bottom:12px;display:block;">
+    <div id="c-error" style="color:#e74c3c;font-size:13px;margin-bottom:10px;min-height:18px;"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+  <input type="checkbox" id="c-remember" style="accent-color:#c9a84c;width:16px;height:16px;">
+  <label for="c-remember" style="font-size:13px;color:#7a7060;cursor:pointer;">Remember me</label>
+</div>
+    <button onclick="casinoLogin()" style="width:100%;background:linear-gradient(135deg,#6b5520,#c9a84c);color:#080c08;border:none;padding:14px;border-radius:8px;font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;letter-spacing:1px;cursor:pointer;">ENTER CASINO</button>
+    <p style="text-align:center;margin-top:14px;font-size:12px;color:#7a7060;">Don't have an account? Register in <span style="color:#c9a84c;">Vault Bank</span> first.</p>
+  </div>
+</div>
+<header>
+  <div class="logo">NEXUS<span>Casino · Private Table</span></div>
+  <div class="header-balance">
+    <div>
+      <div class="hbal-label">BALANCE</div>
+      <div class="hbal-amount" id="headerBal">$0.00</div>
+    </div>
+    <span id ="casinoUsername" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--gold);letter-spacing:2px;"></span>
+    <button class="btn-deposit" onclick="openDeposit()">DEPOSIT</button>
+    <button class="btn-deposit" onclick="openWithdraw()">WITHDRAW</button>
+  </div>
+</header>
+
+<div class="table-wrap">
+  <div class="table-oval" style="position:relative;">
+
+    <div class="count-display">
+      <div class="count-label">HI-LO COUNT</div>
+      <div class="count-num" id="countNum">0</div>
+    </div>
+
+    <div class="dealer-area">
+      <div class="zone-label">Dealer</div>
+      <div class="hand-row" id="dealerHand"></div>
+      <div class="score-badge" id="dealerScore">—</div>
+    </div>
+
+    <div class="table-center">
+      <div class="result-banner" id="resultBanner">BLACKJACK</div>
+      <div class="nexus-text" id="nexusText">✦ NEXUS ✦</div>
+    </div>
+
+    <div class="history-strip" id="historyStrip"></div>
+
+    <div class="player-area">
+      <div class="hand-row" id="playerHand"></div>
+      <div class="score-badge" id="playerScore">—</div>
+      <div class="zone-label" style="margin-top:10px;">You</div>
+    </div>
+
+    <div class="bet-zone">
+      <div>
+        <div class="bet-amount-label">CURRENT BET</div>
+        <div class="bet-amount-display">$<span id="betDisplay">0</span></div>
+      </div>
+      <div class="bet-chips" id="betChipsDisplay"></div>
+    </div>
+
+    <div class="chip-tray" id="chipTray">
+      <div class="chip c1" onclick="addChip(1)">$1</div>
+      <div class="chip c5" onclick="addChip(5)">$5</div>
+      <div class="chip c10" onclick="addChip(10)">$10</div>
+      <div class="chip c25" onclick="addChip(25)">$25</div>
+      <div class="chip c50" onclick="addChip(50)">$50</div>
+      <div class="chip c100" onclick="addChip(100)">$100</div>
+      <div class="chip c500" onclick="addChip(500)">$500</div>
+	  <div class="chip c1k" onclick="addChip(1000)">$1k</div>
+	  <div class="chip c5k" onclick="addChip(5000)">$5k</div>
+	  <div class="chip c10k" onclick="addChip(10000)">$10k</div>
+    </div>
+
+    <div class="action-row">
+      <button class="action-btn btn-clear" id="clearBtn" onclick="clearBet()">Clear Bet</button>
+      <button class="action-btn btn-deal" id="dealBtn" onclick="dealWithShuffle()">DEAL</button>
+      <button class="action-btn btn-hit" id="hitBtn" onclick="hit()" disabled>HIT</button>
+      <button class="action-btn btn-stand" id="standBtn" onclick="stand()" disabled>STAND</button>
+      <button class="action-btn btn-double" id="doubleBtn" onclick="doubleDown()" disabled>DOUBLE</button>
+	  <button class="action-btn btn-split" id="splitBtn" onclick="split()" disabled style="background:#8e44ad;color:#fff;">SPLIT</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-overlay" id="withdrawModal">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" onclick="closeModal('withdrawModal')">✕</button>
+    <div class="modal-title">Withdraw Funds</div>
+    <div class="modal-sub">Enter your Vault Bank card details</div>
+    <input class="modal-input" id="wd-number" placeholder="Card Number" maxlength="22" oninput="fmtCardNum(this)">
+    <div style="display:flex;gap:10px;">
+      <input class="modal-input" id="wd-expiry" placeholder="MM/YY" maxlength="5" style="flex:1" oninput="fmtExpiry(this)">
+      <input class="modal-input" id="wd-cvv" placeholder="CVV" maxlength="3" style="flex:1">
+    </div>
+    <input class="modal-input" id="wd-zip" placeholder="Billing ZIP" maxlength="5">
+    <input class="modal-input" id="wd-amount" placeholder="Amount ($)" type="number" min="1" style="letter-spacing:1px;">
+    <div class="modal-error" id="wdError"></div>
+    <button class="modal-btn" onclick="processWithdraw()">CONFIRM WITHDRAW</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="depositModal">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" onclick="closeModal('depositModal')">✕</button>
+    <div class="modal-title">Deposit Funds</div>
+    <div class="modal-sub">Enter your Vault Bank card details</div>
+    <input class="modal-input" id="dep-number" placeholder="Card Number" maxlength="22" oninput="fmtCardNum(this)">
+    <div style="display:flex;gap:10px;">
+      <input class="modal-input" id="dep-expiry" placeholder="MM/YY" maxlength="5" style="flex:1" oninput="fmtExpiry(this)">
+      <input class="modal-input" id="dep-cvv" placeholder="CVV" maxlength="3" style="flex:1">
+    </div>
+    <input class="modal-input" id="dep-zip" placeholder="Billing ZIP" maxlength="5">
+    <input class="modal-input" id="dep-amount" placeholder="Amount ($)" type="number" min="10" style="letter-spacing:1px;">
+    <div class="modal-error" id="depError"></div>
+    <button class="modal-btn" onclick="processDeposit()">CONFIRM DEPOSIT</button>
+
+    <div class="admin-panel" id="adminPanel" style="display:none;">
+      <div class="admin-title">◆ ADMIN MODE ACTIVE</div>
+      <input class="modal-input" id="adminAmt" placeholder="Credits to add" type="number">
+      <button class="modal-btn" style="margin-top:0;" onclick="addAdminCredits()">ADD CREDITS</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
@@ -20,12 +597,12 @@
   let balance = 0;
   let userData = {};
 
+  // Watch profile changes live across slots and rooms
   if (currentUser) {
     db.ref(`vaultUsers/${currentUser}`).on('value', (snapshot) => {
       userData = snapshot.val() || {};
       balance = parseFloat(userData.balance || 0);
-      const balDisp = document.getElementById('topBalanceDisplay');
-      if (balDisp) balDisp.textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
+      document.getElementById('topBalanceDisplay').textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
     });
   } else {
     alert("Please log into Vault Bank first to fetch your casino credit parameters!");
@@ -49,6 +626,7 @@
         deck.push({ suit: s, value: v });
       }
     }
+    // Shuffle
     for (let i = deck.length - 1; i > 0; i--) {
       let j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -80,44 +658,35 @@
     if (balance < amt) { showToast("Insufficient Bank Vault balance."); return; }
     
     currentBet += amt;
+    // Fast subtract locally to give game feedback before resolving on backend database
     balance -= amt;
-    
-    const betDisp = document.getElementById('betDisplayAmt');
-    const balDisp = document.getElementById('topBalanceDisplay');
-    if (betDisp) betDisp.textContent = currentBet;
-    if (balDisp) balDisp.textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
+    document.getElementById('betDisplayAmt').textContent = currentBet;
+    document.getElementById('topBalanceDisplay').textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
     setBtns(currentBet > 0);
   }
 
   function clearBet() {
     if (gameActive) return;
+    // Revert local view
     balance += currentBet;
     currentBet = 0;
-    
-    const betDisp = document.getElementById('betDisplayAmt');
-    const balDisp = document.getElementById('topBalanceDisplay');
-    if (betDisp) betDisp.textContent = '0';
-    if (balDisp) balDisp.textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
+    document.getElementById('betDisplayAmt').textContent = '0';
+    document.getElementById('topBalanceDisplay').textContent = balance.toLocaleString('en-US', {minimumFractionDigits: 2});
     setBtns(false);
   }
 
   function setBtns(canDeal) {
-    const btnDeal = document.getElementById('btn-deal');
-    const btnHit = document.getElementById('btn-hit');
-    const btnStand = document.getElementById('btn-stand');
-    const btnDouble = document.getElementById('btn-double');
-    const btnClear = document.getElementById('btn-clear');
-
-    if (btnDeal) btnDeal.disabled = gameActive || !canDeal;
-    if (btnHit) btnHit.disabled = !gameActive;
-    if (btnStand) btnStand.disabled = !gameActive;
-    if (btnDouble) btnDouble.disabled = !gameActive || playerHand.length !== 2;
-    if (btnClear) btnClear.disabled = gameActive || currentBet === 0;
+    document.getElementById('btn-deal').disabled = gameActive || !canDeal;
+    document.getElementById('btn-hit').disabled = !gameActive;
+    document.getElementById('btn-stand').disabled = !gameActive;
+    document.getElementById('btn-double').disabled = !gameActive || playerHand.length !== 2;
+    document.getElementById('btn-clear').disabled = gameActive || currentBet === 0;
   }
 
   function startDeal() {
     if (gameActive || currentBet === 0) return;
     
+    // Deduct transaction formally from Cloud Database
     const currentHistory = userData.history || [];
     currentHistory.unshift({
       desc: `Blackjack Bet: -${currentBet}`,
@@ -127,7 +696,7 @@
     });
 
     db.ref(`vaultUsers/${currentUser}`).update({
-      balance: balance,
+      balance: balance, // Already deducted locally in addBet
       history: currentHistory
     }).then(() => {
       gameActive = true;
@@ -137,12 +706,8 @@
 
       renderHands(false);
       setBtns(true);
-      
-      const resText = document.getElementById('resultText');
-      if (resText) {
-        resText.className = 'result-banner';
-        resText.textContent = '';
-      }
+      document.getElementById('resultText').className = 'result-banner';
+      document.getElementById('resultText').textContent = '';
 
       if (getHandScore(playerHand) === 21) {
         standGame();
@@ -154,17 +719,16 @@
     const pRow = document.getElementById('playerCardRow');
     const dRow = document.getElementById('dealerCardRow');
 
-    if (pRow) pRow.innerHTML = playerHand.map(c => makeCardHTML(c, false)).join('');
-    if (dRow) dRow.innerHTML = dealerHand.map((c, idx) => makeCardHTML(c, idx === 1 && !showAllDealer)).join('');
+    pRow.innerHTML = playerHand.map(c => makeCardHTML(c, false)).join('');
+    dRow.innerHTML = dealerHand.map((c, idx) => makeCardHTML(c, idx === 1 && !showAllDealer)).join('');
 
+    // Trigger dealt animations
     setTimeout(() => {
       document.querySelectorAll('.card-el').forEach(el => el.classList.add('dealt'));
     }, 50);
 
-    const pScoreEl = document.getElementById('pScore');
-    const dScoreEl = document.getElementById('dScore');
-    if (pScoreEl) pScoreEl.textContent = getHandScore(playerHand);
-    if (dScoreEl) dScoreEl.textContent = showAllDealer ? getHandScore(dealerHand) : getCardValue(dealerHand[0]);
+    document.getElementById('pScore').textContent = getHandScore(playerHand);
+    document.getElementById('dScore').textContent = showAllDealer ? getHandScore(dealerHand) : getCardValue(dealerHand[0]);
   }
 
   function makeCardHTML(card, isBack) {
@@ -191,15 +755,13 @@
 
   function doubleDown() {
     if (!gameActive || playerHand.length !== 2) return;
-    if (balance < currentBet) { showToast("Insufficient balance for double down."); return; }
+    if (balance < currentBet) { showToast("Insufficient balance for double down optimization."); return; }
 
     const structuralBet = currentBet;
     balance -= structuralBet;
     currentBet += structuralBet;
 
-    const betDisp = document.getElementById('betDisplayAmt');
-    if (betDisp) betDisp.textContent = currentBet;
-    
+    document.getElementById('betDisplayAmt').textContent = currentBet;
     playerHand.push(deck.pop());
     renderHands(false);
 
@@ -239,6 +801,7 @@
       result = 'push'; msg = 'Push!'; payoutFactor = 1;
     }
 
+    // Checking for Natural Blackjack premium payout configuration
     if (pScore === 21 && playerHand.length === 2 && result === 'win') {
       payoutFactor = 2.5;
       msg = 'Natural Blackjack payout executed!';
@@ -264,10 +827,9 @@
       balance: finalBalance,
       history: currentHistory
     }).then(() => {
-      if (result === 'win' && typeof confetti === 'function') confetti();
+      if (result === 'win') confetti();
       currentBet = 0;
-      const betDisp = document.getElementById('betDisplayAmt');
-      if (betDisp) betDisp.textContent = '0';
+      document.getElementById('betDisplayAmt').textContent = '0';
       endGame(result, msg);
     });
   }
@@ -275,10 +837,8 @@
   function endGame(status, msg) {
     gameActive = false;
     const banner = document.getElementById('resultText');
-    if (banner) {
-      banner.textContent = msg;
-      banner.className = `result-banner show ${status}`;
-    }
+    banner.textContent = msg;
+    banner.className = `result-banner show ${status}`;
     setBtns(false);
   }
 
@@ -290,8 +850,7 @@
       secretIdx++;
       if (secretIdx === SECRET.length) {
         secretIdx = 0;
-        const admPanel = document.getElementById('adminPanel');
-        if (admPanel) admPanel.style.display = 'block';
+        document.getElementById('adminPanel').style.display = 'block';
         showToast('System Admin Mode Granted.');
       }
     } else {
@@ -310,20 +869,20 @@
       balance: balance + amt,
       history: currentHistory
     }).then(() => {
-      showToast(`⚡ +$${amt.toFixed(2)} minted safely.`);
+      showToast(`⚡ +$${amt.toFixed(2)} minted safely into database vault.`);
       document.getElementById('adminAmt').value = '';
     });
   }
 
   function showToast(msg) {
     const t = document.getElementById('toast');
-    if (t) {
-      t.textContent = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 2800);
-    }
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
   }
 
   buildDeck();
   setBtns(false);
 </script>
+</body>
+</html>

@@ -1,8 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vault Bank — Private Banking</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c0c0e; --surface: #131318; --surface2: #1a1a22; --border: #2a2a38;
+      --gold: #c9a84c; --gold-light: #e8c96a; --gold-dim: #7a6330;
+      --text: #e8e4d9; --text-dim: #7a7870; --red: #c0392b; --green: #27ae60;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+    body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:999; opacity:0.4; }
+
+    header { border-bottom:1px solid var(--border); padding:22px 48px; display:flex; justify-content:space-between; align-items:center; background:rgba(12,12,14,0.95); position:sticky; top:0; z-index:100; backdrop-filter:blur(12px); }
+    .logo { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:600; color:var(--gold); letter-spacing:3px; text-transform:uppercase; }
+    .logo span { color:var(--text-dim); font-weight:400; font-size:13px; display:block; letter-spacing:5px; margin-top:-2px; }
+    .header-right { display:flex; align-items:center; gap:20px; }
+    .status-dot { width:8px; height:8px; background:var(--green); border-radius:50%; box-shadow:0 0 8px var(--green); animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .status-text { font-size:12px; color:var(--text-dim); letter-spacing:1px; }
+    .username-tag { font-size:13px; color:var(--gold); letter-spacing:2px; font-family:'DM Mono',monospace; }
+    .admin-badge { background:rgba(201,168,76,0.15); border:1px solid var(--gold-dim); color:var(--gold); font-size:10px; letter-spacing:2px; padding:3px 8px; border-radius:4px; font-family:'Outfit',sans-serif; }
+    .logout-btn { background:none; border:1px solid var(--border); color:var(--text-dim); padding:8px 16px; border-radius:8px; font-family:'Outfit',sans-serif; font-size:12px; letter-spacing:1px; cursor:pointer; transition:all 0.2s; }
+    .logout-btn:hover { border-color:var(--gold-dim); color:var(--gold); }
+
+    main { flex:1; max-width:1200px; margin:0 auto; width:100%; padding:48px 24px; display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:start; }
+    .section-label { font-size:11px; letter-spacing:3px; color:var(--gold-dim); text-transform:uppercase; margin-bottom:20px; font-weight:500; }
+
+    .card-wrap { perspective:1000px; cursor:pointer; margin-bottom:32px; }
+    .credit-card { width:100%; max-width:420px; height:240px; border-radius:20px; position:relative; transform-style:preserve-3d; transition:transform 0.7s cubic-bezier(0.4,0,0.2,1); background:linear-gradient(135deg,#1a1610 0%,#2d2410 40%,#1a1610 100%); border:1px solid var(--gold-dim); box-shadow:0 30px 60px rgba(0,0,0,0.8),0 0 0 1px rgba(201,168,76,0.1),inset 0 1px 0 rgba(201,168,76,0.2); overflow:hidden; }
+    .card-wrap:hover .credit-card { transform:rotateY(6deg) rotateX(-3deg); }
+    .credit-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 20% 50%,rgba(201,168,76,0.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(201,168,76,0.05) 0%,transparent 50%); border-radius:20px; }
+    .card-shine { position:absolute; inset:0; background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.03) 50%,transparent 60%); border-radius:20px; }
+    .card-chip { position:absolute; left:32px; top:60px; width:50px; height:38px; background:linear-gradient(135deg,#c9a84c,#8a6f2e,#c9a84c,#f0d080); border-radius:6px; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr 1fr 1fr; gap:1px; padding:4px; overflow:hidden; }
+    .chip-line { background:rgba(0,0,0,0.3); border-radius:1px; }
+    .card-brand { position:absolute; right:28px; top:20px; font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; color:var(--gold); letter-spacing:2px; opacity:0.9; }
+    .card-number { position:absolute; bottom:70px; left:32px; font-family:'DM Mono',monospace; font-size:18px; letter-spacing:4px; color:var(--text); text-shadow:0 1px 3px rgba(0,0,0,0.5); }
+    .card-info { position:absolute; bottom:28px; left:32px; right:32px; display:flex; justify-content:space-between; align-items:flex-end; }
+    .card-label { font-size:9px; letter-spacing:2px; color:var(--gold-dim); text-transform:uppercase; }
+    .card-value { font-family:'DM Mono',monospace; font-size:14px; color:var(--text); margin-top:2px; }
+    .card-cvv-box { text-align:right; }
+    .card-contactless { position:absolute; right:28px; bottom:55px; width:32px; height:32px; opacity:0.5; }
+    .card-contactless::before,.card-contactless::after { content:''; position:absolute; border:2px solid var(--gold); border-radius:50%; right:0; }
+    .card-contactless::before { width:32px; height:32px; top:0; }
+    .card-contactless::after { width:22px; height:22px; top:5px; }
+    .card-inner { position:absolute; width:12px; height:12px; top:10px; right:0; border:2px solid var(--gold); border-radius:50%; }
+    .card-strip { position:absolute; left:0; right:0; top:0; height:6px; background:linear-gradient(90deg,transparent,rgba(201,168,76,0.15),transparent); }
+
+    .card-details { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px; margin-bottom:32px; }
+    .detail-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); }
+    .detail-row:last-child { border-bottom:none; }
+    .detail-key { font-size:12px; color:var(--text-dim); letter-spacing:1px; }
+    .detail-val { font-family:'DM Mono',monospace; font-size:14px; color:var(--gold-light); display:flex; align-items:center; gap:8px; }
+    .copy-btn { background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:12px; padding:2px 6px; border-radius:4px; transition:all 0.2s; }
+    .copy-btn:hover { color:var(--gold); background:rgba(201,168,76,0.1); }
+
+    .balance-panel { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:32px; margin-bottom:24px; }
+    .balance-amount { font-family:'Cormorant Garamond',serif; font-size:56px; font-weight:600; color:var(--gold-light); line-height:1; margin-bottom:6px; }
+    .balance-currency { font-size:22px; color:var(--gold-dim); margin-right:4px; }
+    .balance-sub { font-size:12px; color:var(--text-dim); letter-spacing:1px; }
+
+    .tx-panel { background:var(--surface); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+    .tx-header { padding:20px 24px; border-bottom:1px solid var(--border); }
+    .tx-item { display:flex; justify-content:space-between; align-items:center; padding:16px 24px; border-bottom:1px solid rgba(42,42,56,0.5); transition:background 0.2s; }
+    .tx-item:last-child { border-bottom:none; }
+    .tx-item:hover { background:rgba(255,255,255,0.02); }
+    .tx-desc { font-size:14px; }
+    .tx-date { font-size:11px; color:var(--text-dim); margin-top:2px; font-family:'DM Mono',monospace; }
+    .tx-amount { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; }
+    .tx-amount.pos { color:var(--green); }
+    .tx-amount.neg { color:var(--red); }
+    .tx-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin-right:14px; font-size:16px; flex-shrink:0; }
+    .tx-left { display:flex; align-items:center; }
+
+    .panel { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:32px; margin-bottom:24px; }
+    .input-group { margin-bottom:20px; }
+    .input-label { font-size:12px; color:var(--text-dim); letter-spacing:1px; margin-bottom:8px; display:block; text-transform:uppercase; }
+    .input-field { width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:14px 18px; border-radius:10px; font-family:'DM Mono',monospace; font-size:15px; outline:none; transition:border-color 0.2s; }
+    .input-field:focus { border-color:var(--gold-dim); }
+    .btn-primary { width:100%; background:linear-gradient(135deg,var(--gold-dim),var(--gold)); color:#0c0c0e; border:none; padding:16px; border-radius:10px; font-family:'Outfit',sans-serif; font-weight:600; font-size:15px; letter-spacing:1px; cursor:pointer; transition:all 0.2s; }
+    .btn-primary:hover { filter:brightness(1.1); transform:translateY(-1px); }
+    .btn-primary:active { transform:translateY(0); }
+    .btn-danger { width:100%; background:linear-gradient(135deg,#7b1a1a,#c0392b); color:#fff; border:none; padding:16px; border-radius:10px; font-family:'Outfit',sans-serif; font-weight:600; font-size:15px; letter-spacing:1px; cursor:pointer; transition:all 0.2s; }
+    .btn-danger:hover { filter:brightness(1.1); transform:translateY(-1px); }
+
+    /* ADMIN PANEL */
+    .admin-panel-main { background:rgba(201,168,76,0.04); border:1px solid var(--gold-dim); border-radius:16px; padding:32px; margin-bottom:24px; }
+    .admin-panel-title { font-family:'Cormorant Garamond',serif; font-size:22px; color:var(--gold); letter-spacing:3px; margin-bottom:4px; }
+    .admin-panel-sub { font-size:11px; color:var(--text-dim); letter-spacing:2px; margin-bottom:24px; }
+    .admin-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .admin-card { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:20px; }
+    .admin-card-title { font-size:11px; letter-spacing:2px; color:var(--gold-dim); text-transform:uppercase; margin-bottom:14px; }
+
+    .toast { position:fixed; bottom:32px; right:32px; background:var(--surface2); border:1px solid var(--gold-dim); color:var(--text); padding:14px 22px; border-radius:10px; font-size:14px; transform:translateY(80px); opacity:0; transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1); z-index:1000; }
+    .toast.show { transform:translateY(0); opacity:1; }
+    footer { border-top:1px solid var(--border); padding:24px 48px; display:flex; justify-content:space-between; align-items:center; color:var(--text-dim); font-size:12px; letter-spacing:1px; }
+    @media (max-width:768px) { main { grid-template-columns:1fr; } header { padding:16px 20px; } .admin-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="position:fixed;inset:0;background:#0c0c0e;z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#131318;border:1px solid #7a6330;border-radius:20px;padding:40px;width:400px;max-width:95vw;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:30px;color:#c9a84c;letter-spacing:4px;margin-bottom:6px;">VAULT</div>
+    <div style="font-size:12px;color:#7a7870;letter-spacing:3px;margin-bottom:30px;">PRIVATE BANKING</div>
+    <div style="display:flex;margin-bottom:24px;border:1px solid #2a2a38;border-radius:8px;overflow:hidden;">
+      <button onclick="switchTab('login')" id="tabLogin" style="flex:1;padding:10px;background:#c9a84c;color:#0c0c0e;border:none;font-family:'Outfit',sans-serif;font-weight:600;font-size:13px;letter-spacing:1px;cursor:pointer;">LOGIN</button>
+      <button onclick="switchTab('register')" id="tabRegister" style="flex:1;padding:10px;background:transparent;color:#7a7870;border:none;font-family:'Outfit',sans-serif;font-weight:600;font-size:13px;letter-spacing:1px;cursor:pointer;">REGISTER</button>
+    </div>
+    <input id="auth-username" placeholder="Username" style="width:100%;background:#1a1a22;border:1px solid #2a2a38;color:#e8e4d9;padding:12px 16px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;outline:none;margin-bottom:12px;display:block;">
+    <input id="auth-password" type="password" placeholder="Password" style="width:100%;background:#1a1a22;border:1px solid #2a2a38;color:#e8e4d9;padding:12px 16px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;outline:none;margin-bottom:12px;display:block;">
+    <input id="auth-password2" type="password" placeholder="Confirm Password" style="width:100%;background:#1a1a22;border:1px solid #2a2a38;color:#e8e4d9;padding:12px 16px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;outline:none;margin-bottom:12px;display:none;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <input type="checkbox" id="rememberMe" style="accent-color:#c9a84c;width:16px;height:16px;">
+      <label for="rememberMe" style="font-size:13px;color:#7a7870;cursor:pointer;">Remember me</label>
+    </div>
+    <div id="auth-error" style="color:#e74c3c;font-size:13px;margin-bottom:10px;min-height:18px;"></div>
+    <button onclick="authSubmit()" style="width:100%;background:linear-gradient(135deg,#7a6330,#c9a84c);color:#0c0c0e;border:none;padding:14px;border-radius:8px;font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;letter-spacing:1px;cursor:pointer;">CONTINUE</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">VAULT<span>Private Banking</span></div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <div class="status-text">SECURE CONNECTION</div>
+    <span class="username-tag" id="usernameTag"></span>
+    <span class="admin-badge" id="adminBadge" style="display:none;">ADMIN</span>
+    <button class="logout-btn" onclick="logout()">LOG OUT</button>
+  </div>
+</header>
+
+<main id="mainContent">
+  <!-- LEFT -->
+  <div>
+    <p class="section-label">Your Card</p>
+    <div class="card-wrap">
+      <div class="credit-card">
+        <div class="card-strip"></div>
+        <div class="card-shine"></div>
+        <div class="card-brand">VAULT</div>
+        <div class="card-chip">
+          <div class="chip-line"></div><div class="chip-line"></div><div class="chip-line"></div>
+          <div class="chip-line"></div><div class="chip-line"></div><div class="chip-line"></div>
+          <div class="chip-line"></div><div class="chip-line"></div><div class="chip-line"></div>
+        </div>
+        <div class="card-number" id="displayCardNumber">•••• •••• •••• ••••</div>
+        <div class="card-info">
+          <div>
+            <div class="card-label">Cardholder</div>
+            <div class="card-value" id="displayName">—</div>
+          </div>
+          <div>
+            <div class="card-label">Expires</div>
+            <div class="card-value" id="displayExpiry">MM/YY</div>
+          </div>
+          <div class="card-cvv-box">
+            <div class="card-label">CVV</div>
+            <div class="card-value" id="displayCVV">•••</div>
+          </div>
+        </div>
+        <div class="card-contactless"><div class="card-inner"></div></div>
+      </div>
+    </div>
+
+    <div class="card-details">
+      <p class="section-label" style="margin-bottom:12px;">Card Information</p>
+      <div class="detail-row"><span class="detail-key">Card Number</span><span class="detail-val" id="cardNum">—</span></div>
+      <div class="detail-row"><span class="detail-key">Expiry Date</span><span class="detail-val" id="cardExp">—</span></div>
+      <div class="detail-row"><span class="detail-key">CVV</span><span class="detail-val" id="cardCvv">—</span></div>
+      <div class="detail-row"><span class="detail-key">Billing ZIP</span><span class="detail-val" id="cardZip">—</span></div>
+    </div>
+
+    <div class="tx-panel">
+      <div class="tx-header"><p class="section-label" style="margin-bottom:0">Recent Transactions</p></div>
+      <div id="txList"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div>
+    <p class="section-label">Account Overview</p>
+    <div class="balance-panel">
+      <div class="balance-amount"><span class="balance-currency">$</span><span id="balanceDisplay">0.00</span></div>
+      <div class="balance-sub">Available Balance · Vault Prestige Account</div>
+    </div>
+
+    <p class="section-label">Send to Casino</p>
+    <div class="panel">
+      <div class="input-group">
+        <label class="input-label">Amount (USD)</label>
+        <input class="input-field" type="number" id="casinoAmt" placeholder="0.00" min="10" step="10">
+      </div>
+      <button class="btn-primary" onclick="sendToCasino()">TRANSFER TO CASINO</button>
+    </div>
+
+    <p class="section-label">Transfer by Card Number</p>
+    <div class="panel">
+      <div class="input-group">
+        <label class="input-label">Recipient Card Number</label>
+        <input class="input-field" type="text" id="transferCardNum" placeholder="XXXX XXXX XXXX XXXX" maxlength="22">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Amount (USD)</label>
+        <input class="input-field" type="number" id="transferCardAmt" placeholder="0.00" min="1">
+      </div>
+      <button class="btn-primary" onclick="transferByCard()">SEND TRANSFER</button>
+    </div>
+
+    <p class="section-label">Change Password</p>
+    <div class="panel">
+      <div class="input-group">
+        <label class="input-label">Current Password</label>
+        <input class="input-field" type="password" id="oldPass" placeholder="••••••••">
+      </div>
+      <div class="input-group">
+        <label class="input-label">New Password</label>
+        <input class="input-field" type="password" id="newPass" placeholder="••••••••">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Confirm New Password</label>
+        <input class="input-field" type="password" id="newPass2" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" onclick="changePassword()">CHANGE PASSWORD</button>
+    </div>
+  </div>
+</main>
+
+<!-- ADMIN PANEL (injected after login if admin) -->
+<div id="adminSection" style="display:none;max-width:1200px;margin:0 auto;padding:0 24px 48px;">
+  <div class="admin-panel-main">
+    <div class="admin-panel-title">◆ ADMIN PANEL</div>
+    <div class="admin-panel-sub">VAULT BANK · SYSTEM ACCESS</div>
+    <div class="admin-grid">
+
+      <div class="admin-card">
+        <div class="admin-card-title">💰 Give Money to User</div>
+        <div class="input-group">
+          <label class="input-label">Username</label>
+          <input class="input-field" id="adminGiveUser" placeholder="username">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Amount ($)</label>
+          <input class="input-field" type="number" id="adminGiveAmt" placeholder="0.00">
+        </div>
+        <button class="btn-primary" onclick="adminGive()">GIVE MONEY</button>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">💸 Take Money from User</div>
+        <div class="input-group">
+          <label class="input-label">Username</label>
+          <input class="input-field" id="adminTakeUser" placeholder="username">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Amount ($)</label>
+          <input class="input-field" type="number" id="adminTakeAmt" placeholder="0.00">
+        </div>
+        <button class="btn-danger" onclick="adminTake()">TAKE MONEY</button>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">⚡ Add Money to Yourself</div>
+        <div class="input-group">
+          <label class="input-label">Amount ($)</label>
+          <input class="input-field" type="number" id="adminSelfAmt" placeholder="0.00">
+        </div>
+        <button class="btn-primary" onclick="adminSelf()">ADD TO MY ACCOUNT</button>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">🔄 Reset User Balance</div>
+        <div class="input-group">
+          <label class="input-label">Username</label>
+          <input class="input-field" id="adminResetUser" placeholder="username">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Set balance to ($)</label>
+          <input class="input-field" type="number" id="adminResetAmt" placeholder="5000">
+        </div>
+        <button class="btn-danger" onclick="adminReset()">SET BALANCE</button>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">🗑️ Delete User Account</div>
+        <div class="input-group">
+          <label class="input-label">Username</label>
+          <input class="input-field" id="adminDeleteUser" placeholder="username">
+        </div>
+        <button class="btn-danger" onclick="adminDelete()">DELETE ACCOUNT</button>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">👥 All Users</div>
+        <div id="adminUserList" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text-dim);line-height:2;max-height:160px;overflow-y:auto;"></div>
+        <button class="btn-primary" style="margin-top:12px;" onclick="adminRefreshUsers()">REFRESH</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>© 2025 VAULT PRIVATE BANKING</span>
+  <span>Account secured · 256-bit AES</span>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
 <script>
-  // Ваша конфигурация Firebase
+  // Your exact Firebase configuration
   const firebaseConfig = {
     apiKey: "AIzaSyC25opJgTxCJacH1r2gS9iaqfYHjGzADus",
     authDomain: "nitty-casino.firebaseapp.com",
@@ -13,34 +328,22 @@
     measurementId: "G-XP8ZLV0GR1"
   };
 
-  // Инициализация Firebase
+  // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
   const ADMIN_USERS = ['admin', 'owner', 'Nitty'];
   let currentUser = null;
+  let allUsersData = {};
 
-  // Функция для получения всех пользователей (теперь из Firebase)
-  function getUsers(callback) {
-    db.ref('vaultUsers').once('value', (snapshot) => {
-      callback(snapshot.val() || {});
-    });
-  }
-
-  // Функция сохранения (теперь в Firebase)
-  function saveUsers(users, callback) {
-    db.ref('vaultUsers').set(users, () => {
-      if (callback) callback();
-    });
-  }
-
-  // --- Реальное время: следим за базой данных ---
+  // --- Real-time Sync Engine ---
+  // Automatically syncs users and redraws the leaderboard/admin tools live when changes occur
   db.ref('vaultUsers').on('value', (snapshot) => {
-    const users = snapshot.val() || {};
-    adminRefreshUsers(); // Обновляем список админа при любых изменениях
+    allUsersData = snapshot.val() || {};
+    adminRefreshUsers();
     
-    if (currentUser && users[currentUser]) {
-      updateUI(users[currentUser]);
+    if (currentUser && allUsersData[currentUser]) {
+      updateUI(allUsersData[currentUser]);
     }
   });
 
@@ -65,32 +368,29 @@
 
     const isRegistering = document.getElementById('auth-btn').textContent.includes('REGISTER');
 
-    getUsers((users) => {
-      if (isRegistering) {
-        if (users[user]) {
-          errorEl.textContent = "Account nickname already exists.";
-          return;
-        }
-        const newUser = {
-          pin: pin,
-          balance: 1000.00,
-          accountNumber: "VLT-" + Math.floor(100000 + Math.random() * 900000),
-          cvv: Math.floor(100 + Math.random() * 900),
-          expiry: "12/31",
-          history: [{desc: "Account Activated", amt: 1000.00, type: "pos", date: new Date().toLocaleString()}]
-        };
-        users[user] = newUser;
-        saveUsers(users, () => {
-          loginAs(user, newUser);
-        });
-      } else {
-        if (users[user] && users[user].pin === pin) {
-          loginAs(user, users[user]);
-        } else {
-          errorEl.textContent = "Invalid account reference or security PIN.";
-        }
+    if (isRegistering) {
+      if (allUsersData[user]) {
+        errorEl.textContent = "Account nickname already exists.";
+        return;
       }
-    });
+      const newUser = {
+        pin: pin,
+        balance: 1000.00, // Starting balance bonus
+        accountNumber: "VLT-" + Math.floor(100000 + Math.random() * 900000),
+        cvv: Math.floor(100 + Math.random() * 900),
+        expiry: "12/31",
+        history: [{desc: "Account Activated", amt: 1000.00, type: "pos", date: new Date().toLocaleString()}]
+      };
+      db.ref('vaultUsers/' + user).set(newUser).then(() => {
+        loginAs(user, newUser);
+      });
+    } else {
+      if (allUsersData[user] && allUsersData[user].pin === pin) {
+        loginAs(user, allUsersData[user]);
+      } else {
+        errorEl.textContent = "Invalid account reference or security PIN.";
+      }
+    }
   }
 
   function loginAs(username, data) {
@@ -156,144 +456,129 @@
       showToast("Please provide valid transfer references.");
       return;
     }
+    if (!allUsersData[target]) {
+      showToast("Target client registry not found.");
+      return;
+    }
     if (target === currentUser) {
       showToast("Cannot wire credits to yourself.");
       return;
     }
 
-    getUsers((users) => {
-      if (!users[target]) {
-        showToast("Target client registry not found.");
-        return;
-      }
+    const myData = allUsersData[currentUser];
+    if (myData.balance < amount) {
+      showToast("Insufficient vault limits available.");
+      return;
+    }
 
-      const myData = users[currentUser];
-      if (myData.balance < amount) {
-        showToast("Insufficient vault limits available.");
-        return;
-      }
+    const timeString = new Date().toLocaleString();
+    
+    // Debit sender
+    const myHistory = myData.history || [];
+    myHistory.unshift({ desc: `Wire to ${target}`, amt: amount, type: "neg", date: timeString });
+    
+    // Credit receiver
+    const targetData = allUsersData[target];
+    const targetHistory = targetData.history || [];
+    targetHistory.unshift({ desc: `Wire from ${currentUser}`, amt: amount, type: "pos", date: timeString });
 
-      const timeString = new Date().toLocaleString();
-      
-      myData.history = myData.history || [];
-      myData.history.unshift({ desc: `Wire to ${target}`, amt: amount, type: "neg", date: timeString });
-      myData.balance -= amount;
-      
-      const targetData = users[target];
-      targetData.history = targetData.history || [];
-      targetHistory = targetData.history;
-      targetHistory.unshift({ desc: `Wire from ${currentUser}`, amt: amount, type: "pos", date: timeString });
-      targetData.balance += amount;
+    const updates = {};
+    updates[`/vaultUsers/${currentUser}/balance`] = myData.balance - amount;
+    updates[`/vaultUsers/${currentUser}/history`] = myHistory;
+    updates[`/vaultUsers/${target}/balance`] = targetData.balance + amount;
+    updates[`/vaultUsers/${target}/history`] = targetHistory;
 
-      saveUsers(users, () => {
-        showToast(`Successfully wired $${amount.toFixed(2)} to ${target}`);
-        document.getElementById('wire-target').value = '';
-        document.getElementById('wire-amount').value = '';
-      });
+    db.ref().update(updates).then(() => {
+      showToast(`Successfully wired $${amount.toFixed(2)} to ${target}`);
+      document.getElementById('wire-target').value = '';
+      document.getElementById('wire-amount').value = '';
     });
   }
 
-  // --- Админ-панель банка ---
+  // --- Admin Commands ---
   function adminAdjustBalance() {
-    const username = document.getElementById('admin-target-user').value.trim();
+    const user = document.getElementById('admin-target-user').value.trim();
     const amount = parseFloat(document.getElementById('admin-amount-adjust').value);
 
-    if (!username || isNaN(amount)) {
+    if (!user || isNaN(amount) || !allUsersData[user]) {
       showToast("Invalid admin command credentials.");
       return;
     }
 
-    getUsers((users) => {
-      if (!users[username]) {
-        showToast("Target client entry not found.");
-        return;
-      }
+    const userData = allUsersData[user];
+    const currentBal = parseFloat(userData.balance || 0);
+    const newBal = currentBal + amount;
+    const history = userData.history || [];
+    history.unshift({
+      desc: "System Admin Adjustment",
+      amt: Math.abs(amount),
+      type: amount >= 0 ? "pos" : "neg",
+      date: new Date().toLocaleString()
+    });
 
-      users[username].balance = (parseFloat(users[username].balance) || 0) + amount;
-      users[username].history = users[username].history || [];
-      users[username].history.unshift({
-        desc: "System Admin Adjustment",
-        amt: Math.abs(amount),
-        type: amount >= 0 ? "pos" : "neg",
-        date: new Date().toLocaleString()
-      });
-
-      saveUsers(users, () => {
-        showToast(`Adjusted balance for ${username} by $${amount.toFixed(2)}`);
-        document.getElementById('admin-target-user').value = '';
-        document.getElementById('admin-amount-adjust').value = '';
-      });
+    db.ref(`vaultUsers/${user}`).update({
+      balance: newBal,
+      history: history
+    }).then(() => {
+      showToast(`Adjusted balance for ${user} by $${amount.toFixed(2)}`);
+      document.getElementById('admin-target-user').value = '';
+      document.getElementById('admin-amount-adjust').value = '';
     });
   }
 
   function adminDeleteUser() {
-    const username = document.getElementById('admin-target-user').value.trim();
-    if (!username) {
+    const user = document.getElementById('admin-target-user').value.trim();
+    if (!user || !allUsersData[user]) {
       showToast("Target client entry not found.");
       return;
     }
-    if (username === currentUser) {
+    if (user === currentUser) {
       showToast("Cannot delete your own supervisor terminal.");
       return;
     }
 
-    if (!confirm(`Permanently erase ${username} from database?`)) return;
+    if (!confirm(`Permanently erase ${user} from database?`)) return;
 
-    getUsers((users) => {
-      if (!users[username]) {
-        showToast("Target client entry not found.");
-        return;
-      }
-      delete users[username];
-      saveUsers(users, () => {
-        showToast(`Client account "${username}" erased.`);
-        document.getElementById('admin-target-user').value = '';
-      });
+    db.ref(`vaultUsers/${user}`).remove().then(() => {
+      showToast(`Client account "${user}" erased.`);
+      document.getElementById('admin-target-user').value = '';
     });
   }
 
   function adminRefreshUsers() {
     const el = document.getElementById('adminUserList');
-    if (!el) return;
+    const list = Object.keys(allUsersData);
+    if (!list.length) { el.textContent = 'No records active'; return; }
     
-    getUsers((users) => {
-      const list = Object.keys(users);
-      if (!list.length) { el.textContent = 'No records active'; return; }
-      
-      el.innerHTML = list.map(u => {
-        const bal = parseFloat(users[u].balance || 0).toLocaleString('en-US', {minimumFractionDigits:2});
-        const isAdm = ADMIN_USERS.includes(u) ? ' 👑' : '';
-        return `
-          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,56,0.4);">
-            <span style="color:var(--text)">${u}${isAdm}</span>
-            <span style="color:var(--gold)">$${bal}</span>
-          </div>`;
-      }).join('');
-    });
+    el.innerHTML = list.map(u => {
+      const bal = parseFloat(allUsersData[u].balance || 0).toLocaleString('en-US', {minimumFractionDigits:2});
+      const isAdm = ADMIN_USERS.includes(u) ? ' 👑' : '';
+      return `
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,56,0.4);">
+          <span style="color:var(--text)">${u}${isAdm}</span>
+          <span style="color:var(--gold)">$${bal}</span>
+        </div>`;
+    }).join('');
   }
 
+  // Helper Elements
   function copyText(text) {
     navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
   }
-  
   function showToast(msg) {
     const t = document.getElementById('toast');
-    if (t) {
-      t.textContent = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 2800);
-    }
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
   }
 
-  // Проверка сохраненной сессии при загрузке
+  // Auto Session Bootstrapper
   const remembered = localStorage.getItem('vaultRemember');
-  if (remembered) {
-    setTimeout(() => {
-      getUsers((users) => {
-        if (users[remembered]) {
-          loginAs(remembered, users[remembered]);
-        }
-      });
-    }, 1000);
-  }
+  setTimeout(() => {
+    if (remembered && allUsersData[remembered]) {
+      loginAs(remembered, allUsersData[remembered]);
+    }
+  }, 1200);
 </script>
+</body>
+</html>
