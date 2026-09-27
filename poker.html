@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Nitty Casino — Texas Hold'em</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body class="game-page">
   <div class="stars"></div>
 
-  <!-- Navbar -->
   <nav class="navbar">
     <div class="nav-logo">🎰 <span>NITTY CASINO</span></div>
     <div class="nav-center">
@@ -25,108 +24,97 @@
 
   <main class="game-main">
 
-    <!-- ── MODE SELECTOR ── -->
+    <!-- MODE SELECT -->
     <div id="mode-screen">
       <div class="welcome-banner" style="margin-bottom:32px">
         <h2>♠️ <span style="color:var(--gold)">Texas Hold'em</span></h2>
         <p class="welcome-sub">Outwit the bots or challenge real players</p>
       </div>
       <div class="mode-selector">
-        <div class="mode-card" onclick="startSolo()">
+        <div class="mode-card" onclick="pkStartSolo()">
           <div class="mode-icon">🤖</div>
           <div class="mode-name">VS BOTS</div>
-          <div class="mode-desc">Play against 3 AI bots</div>
+          <div class="mode-desc">Play against 3 AI opponents</div>
         </div>
-        <div class="mode-card" onclick="showMultiLobby()">
+        <div class="mode-card" onclick="pkShowLobby()">
           <div class="mode-icon">👥</div>
           <div class="mode-name">MULTIPLAYER</div>
-          <div class="mode-desc">Create or join a live poker room</div>
+          <div class="mode-desc">Create or join a live room</div>
         </div>
       </div>
     </div>
 
-    <!-- ── MULTIPLAYER LOBBY ── -->
+    <!-- MULTIPLAYER LOBBY -->
     <div id="multi-lobby" class="hidden">
       <div class="lobby-section">
         <div class="lobby-header">
           <h3>♠️ POKER ROOMS</h3>
-          <button class="btn-secondary" onclick="showModeScreen()">← Back</button>
+          <button class="btn-secondary" onclick="pkShowMode()">← Back</button>
         </div>
-        <div class="rooms-list" id="pk-rooms-list">
-          <p class="no-rooms">No open rooms. Create one!</p>
-        </div>
+        <div class="rooms-list" id="pk-rooms-list"><p class="no-rooms">No open rooms.</p></div>
       </div>
       <div class="create-room-form">
         <h4>➕ CREATE ROOM</h4>
         <div class="form-row">
-          <input type="number" id="pk-room-bet" class="form-input" placeholder="Blind amount (min 10)" min="10" value="20"/>
-          <button class="btn-primary" onclick="createMultiRoom()">🃏 Create Room</button>
+          <input type="number" id="pk-room-bet" class="form-input" placeholder="Blind (min 10)" min="10" value="20"/>
+          <button class="btn-primary" onclick="pkCreateRoomUI()">🃏 Create</button>
         </div>
         <div id="pk-create-msg" class="error-msg" style="margin-top:8px"></div>
       </div>
     </div>
 
-    <!-- ── WAITING ROOM ── -->
+    <!-- WAITING ROOM -->
     <div id="waiting-room-screen" class="hidden">
       <div class="waiting-room">
         <h3>⏳ WAITING FOR PLAYERS</h3>
         <div class="room-id-display" id="room-id-display"></div>
-        <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">Share the Room ID with friends</p>
+        <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">Share Room ID with friends</p>
         <div class="players-waiting" id="waiting-players-list"></div>
-        <button id="start-multi-btn" class="btn-primary" style="margin-top:18px;width:100%" onclick="startMultiGame()" disabled>
-          🎮 Start Game
-        </button>
-        <button class="btn-secondary" style="margin-top:10px;width:100%" onclick="leaveRoom()">Leave Room</button>
+        <button id="pk-start-btn" class="btn-primary" style="margin-top:18px;width:100%" onclick="pkStartMulti()" disabled>🎮 Start Game</button>
+        <button class="btn-secondary" style="margin-top:10px;width:100%" onclick="pkLeave()">Leave Room</button>
       </div>
     </div>
 
-    <!-- ── GAME TABLE ── -->
+    <!-- GAME TABLE -->
     <div id="game-screen" class="hidden">
-
-      <!-- Poker Table -->
       <div class="poker-table">
-
-        <!-- Community Cards -->
         <div class="community-area">
           <div class="pot-display">POT: <span id="pot-display">0</span> coins</div>
           <div class="community-cards" id="community-cards"></div>
           <div style="color:var(--text-dim);font-size:.82rem;letter-spacing:2px" id="street-label">PRE-FLOP</div>
         </div>
-
-        <!-- Seats -->
         <div class="poker-seats" id="poker-seats"></div>
       </div>
 
-      <!-- Your cards -->
       <div style="text-align:center;margin-bottom:12px">
         <div style="color:var(--text-dim);font-size:.78rem;letter-spacing:2px;margin-bottom:8px">YOUR HAND</div>
         <div id="player-hole-cards" style="display:flex;gap:8px;justify-content:center"></div>
         <div id="player-hand-rank" style="color:var(--gold);font-size:.9rem;font-weight:700;margin-top:6px;letter-spacing:1px"></div>
       </div>
 
-      <!-- Round Log -->
       <div class="round-log" id="round-log"></div>
 
-      <!-- Actions -->
       <div class="poker-actions" id="poker-actions" style="display:none">
-        <button class="pk-btn pk-btn-fold"  id="pk-fold"  onclick="pkAction('fold')">Fold</button>
-        <button class="pk-btn pk-btn-check" id="pk-check" onclick="pkAction('check')">Check</button>
-        <button class="pk-btn pk-btn-call"  id="pk-call"  onclick="pkAction('call')">Call <span id="call-amount"></span></button>
+        <button class="pk-btn pk-btn-fold"  onclick="pkAction('fold')">Fold</button>
+        <button class="pk-btn pk-btn-check" id="pk-check-btn" onclick="pkAction('check')">Check</button>
+        <button class="pk-btn pk-btn-call"  id="pk-call-btn"  onclick="pkAction('call')">Call <span id="call-amount"></span></button>
         <div class="raise-input-row">
-          <input type="number" id="raise-amount" class="raise-input" placeholder="Raise to..." min="1"/>
+          <input type="number" id="raise-amount" class="raise-input" placeholder="Raise to..."/>
           <button class="pk-btn pk-btn-raise" onclick="pkAction('raise')">Raise</button>
         </div>
         <button class="pk-btn pk-btn-allin" onclick="pkAction('allin')">All-In</button>
       </div>
 
-      <div id="pk-status-msg" style="text-align:center;font-family:'Cinzel',serif;font-size:1.15rem;color:var(--gold);min-height:28px;margin-bottom:12px;letter-spacing:2px"></div>
-
-      <button class="btn-secondary" style="display:block;margin:0 auto" onclick="backToModeScreen()">← Back to Menu</button>
+      <div id="pk-status-msg" style="text-align:center;font-family:'Cinzel',serif;font-size:1.1rem;color:var(--gold);min-height:28px;margin-bottom:12px;letter-spacing:2px"></div>
+      <button class="btn-secondary" style="display:block;margin:0 auto" onclick="pkShowMode()">← Back to Menu</button>
     </div>
 
   </main>
 
-  <script type="module" src="auth.js"></script>
-  <script type="module" src="poker.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase.js"></script>
+  <script src="auth.js"></script>
+  <script src="poker.js"></script>
 </body>
 </html>

@@ -1,33 +1,23 @@
 /* =============================================
-   NITTY CASINO — Admin Panel (Firebase)
+   NITTY CASINO — Admin Panel
+   Uses username as DB key (no Firebase Auth)
    ============================================= */
 
-import {
-  dbGetAllUsers, dbUpdateUser, dbLogActivity,
-  dbListenActivity, dbSetBroadcast
-} from './firebase.js';
-import { currentUser, currentUid, ADMIN_USERNAME } from './auth.js';
+var allUsers    = [];
+var deleteTarget = null; // username to delete
 
-let allUsers    = [];
-let deleteUid   = null;
-let deleteUname = null;
-let unsubActivity = null;
-
-/* ── Init ──────────────────────────────────── */
-// Wait for auth to set currentUser, then init
-const initInterval = setInterval(async () => {
+/* ── Wait for auth to load ─────────────────── */
+var adminInitInterval = setInterval(function() {
   if (!currentUser) return;
-  clearInterval(initInterval);
-
+  clearInterval(adminInitInterval);
   if (currentUser.username !== ADMIN_USERNAME) {
-    window.location.href = 'casino.html';
-    return;
+    window.location.href = 'casino.html'; return;
   }
+  loadAll();
+  dbListenActivity(renderActivityLog);
+}, 150);
 
-  await loadAll();
-  startActivityListener();
-}, 200);
-
+/* ── Load all users ────────────────────────── */
 async function loadAll() {
   allUsers = await dbGetAllUsers();
   renderStats();
@@ -35,199 +25,156 @@ async function loadAll() {
   populateSelects();
 }
 
-/* ── Stats ─────────────────────────────────── */
+/* ── Stats cards ───────────────────────────── */
 function renderStats() {
-  document.getElementById('stat-users').textContent  = allUsers.length;
-
-  const totalGames = allUsers.reduce((s, u) => s + (u.gamesPlayed || 0), 0);
-  document.getElementById('stat-games').textContent  = totalGames.toLocaleString('en-US');
-
-  const totalCoins = allUsers.reduce((s, u) => s + (u.balance || 0), 0);
-  document.getElementById('stat-coins').textContent  = totalCoins.toLocaleString('en-US');
-
-  const top = [...allUsers].sort((a, b) => b.balance - a.balance)[0];
-  document.getElementById('stat-top').textContent    = top ? top.username : '—';
+  document.getElementById('stat-users').textContent = allUsers.length;
+  var totalGames = allUsers.reduce(function(s,u){ return s+(u.gamesPlayed||0); }, 0);
+  document.getElementById('stat-games').textContent = totalGames.toLocaleString('en-US');
+  var totalCoins = allUsers.reduce(function(s,u){ return s+(u.balance||0); }, 0);
+  document.getElementById('stat-coins').textContent = totalCoins.toLocaleString('en-US');
+  var sorted = allUsers.slice().sort(function(a,b){ return b.balance-a.balance; });
+  document.getElementById('stat-top').textContent = sorted[0] ? sorted[0].username : '—';
 }
 
-/* ── Users Table ───────────────────────────── */
-function renderUsersTable(filter = '') {
-  const tbody = document.getElementById('users-tbody');
+/* ── Users table ───────────────────────────── */
+function renderUsersTable(filter) {
+  filter = filter || '';
+  var tbody = document.getElementById('users-tbody');
   if (!tbody) return;
-
-  let list = allUsers;
+  var list = allUsers;
   if (filter) {
-    const f = filter.toLowerCase();
-    list = list.filter(u => u.username.toLowerCase().includes(f) || (u.email || '').toLowerCase().includes(f));
+    var f = filter.toLowerCase();
+    list = list.filter(function(u){ return u.username.toLowerCase().includes(f); });
   }
-
-  if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:20px">No players found</td></tr>';
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">No players found</td></tr>';
     return;
   }
-
-  tbody.innerHTML = list.map((u, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td>
-        <strong>${u.username}</strong>
-        ${u.isAdmin ? ' <span style="color:var(--gold);font-size:.74rem">👑 ADMIN</span>' : ''}
-      </td>
-      <td style="color:var(--text-dim);font-size:.84rem">${u.email || '—'}</td>
-      <td style="color:var(--gold);font-weight:700">💰 ${Number(u.balance || 0).toLocaleString('en-US')}</td>
-      <td style="color:var(--text-dim)">${u.gamesPlayed || 0}</td>
-      <td>
-        <span class="status-badge ${u.banned ? 'status-banned' : 'status-active'}">
-          ${u.banned ? '🚫 Banned' : '✅ Active'}
-        </span>
-      </td>
-      <td>
-        ${u.username !== ADMIN_USERNAME ? `
-          <div class="table-actions">
-            <button class="tbl-btn tbl-btn-ban" onclick="toggleBan('${u.uid}','${u.username}')">
-              ${u.banned ? '✅ Unban' : '🚫 Ban'}
-            </button>
-            <button class="tbl-btn tbl-btn-del" onclick="promptDelete('${u.uid}','${u.username}')">
-              🗑️ Delete
-            </button>
-          </div>
-        ` : '<span style="color:var(--text-dim);font-size:.8rem">—</span>'}
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = list.map(function(u, i) {
+    var isAdmin = u.username === ADMIN_USERNAME;
+    return '<tr>' +
+      '<td>' + (i+1) + '</td>' +
+      '<td><strong>' + u.username + '</strong>' + (u.isAdmin ? ' <span style="color:var(--gold);font-size:.74rem">👑 ADMIN</span>' : '') + '</td>' +
+      '<td style="color:var(--gold);font-weight:700">💰 ' + Number(u.balance||0).toLocaleString('en-US') + '</td>' +
+      '<td style="color:var(--text-dim)">' + (u.gamesPlayed||0) + '</td>' +
+      '<td><span class="status-badge ' + (u.banned ? 'status-banned' : 'status-active') + '">' + (u.banned ? '🚫 Banned' : '✅ Active') + '</span></td>' +
+      '<td>' + (isAdmin ? '<span style="color:var(--text-dim);font-size:.8rem">—</span>' :
+        '<div class="table-actions">' +
+        '<button class="tbl-btn tbl-btn-ban" onclick="toggleBan(\'' + u.username + '\')">' + (u.banned ? '✅ Unban' : '🚫 Ban') + '</button>' +
+        '<button class="tbl-btn tbl-btn-del" onclick="promptDelete(\'' + u.username + '\')">🗑️ Delete</button>' +
+        '</div>') + '</td>' +
+      '</tr>';
+  }).join('');
 }
 
-window.filterUsers = function() {
+function filterUsers() {
   renderUsersTable(document.getElementById('user-search').value);
-};
+}
 
-/* ── Toggle Ban ────────────────────────────── */
-window.toggleBan = async function(uid, username) {
-  const user = allUsers.find(u => u.uid === uid);
+/* ── Ban / Unban ───────────────────────────── */
+async function toggleBan(username) {
+  var user = allUsers.find(function(u){ return u.username === username; });
   if (!user) return;
   user.banned = !user.banned;
-  await dbUpdateUser(uid, { banned: user.banned });
-  const action = user.banned ? 'banned' : 'unbanned';
-  await dbLogActivity('admin', `Nitty ${action} player ${username}`);
+  await dbUpdateUser(username, { banned: user.banned });
+  await dbLogActivity('admin', 'Nitty ' + (user.banned ? 'banned' : 'unbanned') + ' ' + username);
   await loadAll();
-};
+}
 
 /* ── Delete ────────────────────────────────── */
-window.promptDelete = function(uid, username) {
-  deleteUid   = uid;
-  deleteUname = username;
-  document.getElementById('delete-username-display').textContent = `Player: ${username}`;
+function promptDelete(username) {
+  deleteTarget = username;
+  document.getElementById('delete-username-display').textContent = 'Player: ' + username;
   document.getElementById('delete-modal').classList.remove('hidden');
-};
-
-window.confirmDelete = async function() {
-  if (!deleteUid) return;
-  // Firebase Auth user deletion requires Admin SDK — we just mark as banned & wipe data
-  await dbUpdateUser(deleteUid, { banned: true, username: `[deleted]`, balance: 0, email: '' });
-  await dbLogActivity('admin', `Nitty deleted player ${deleteUname}`);
-  deleteUid = deleteUname = null;
+}
+async function confirmDelete() {
+  if (!deleteTarget) return;
+  await dbUpdateUser(deleteTarget, { username: '[deleted]', banned: true, balance: 0 });
+  await dbLogActivity('admin', 'Nitty deleted player ' + deleteTarget);
+  deleteTarget = null;
   document.getElementById('delete-modal').classList.add('hidden');
   await loadAll();
-};
-
-window.cancelDelete = function() {
-  deleteUid = deleteUname = null;
+}
+function cancelDelete() {
+  deleteTarget = null;
   document.getElementById('delete-modal').classList.add('hidden');
-};
+}
 
-/* ── Populate Selects ──────────────────────── */
+/* ── Populate selects ──────────────────────── */
 function populateSelects() {
-  const non = allUsers.filter(u => u.username !== ADMIN_USERNAME && !u.banned);
-  const opts = non.map(u => `<option value="${u.uid}" data-name="${u.username}">${u.username} (💰${u.balance})</option>`).join('');
-  const empty = '<option value="">— Select player —</option>';
-  ['give-user', 'reset-user'].forEach(id => {
-    const el = document.getElementById(id);
+  var opts = allUsers
+    .filter(function(u){ return u.username !== ADMIN_USERNAME && !u.banned && u.username !== '[deleted]'; })
+    .map(function(u){ return '<option value="' + u.username + '">' + u.username + ' (💰' + (u.balance||0) + ')</option>'; })
+    .join('');
+  var empty = '<option value="">— Select player —</option>';
+  ['give-user','reset-user'].forEach(function(id){
+    var el = document.getElementById(id);
     if (el) el.innerHTML = empty + opts;
   });
 }
 
-/* ── Give Coins ────────────────────────────── */
-window.giveCoins = async function() {
-  const sel    = document.getElementById('give-user');
-  const uid    = sel.value;
-  const amount = parseInt(document.getElementById('give-amount').value, 10);
-  const msgEl  = document.getElementById('give-msg');
+/* ── Give coins ────────────────────────────── */
+async function giveCoins() {
+  var username = document.getElementById('give-user').value;
+  var amount   = parseInt(document.getElementById('give-amount').value, 10);
+  var msgEl    = document.getElementById('give-msg');
   msgEl.textContent = '';
-
-  if (!uid)             { msgEl.style.color='var(--red)'; msgEl.textContent='❌ Select a player'; return; }
-  if (!amount || amount<=0) { msgEl.style.color='var(--red)'; msgEl.textContent='❌ Enter a valid amount'; return; }
-
-  const user = allUsers.find(u => u.uid === uid);
+  if (!username)         { msgEl.style.color='var(--red)'; msgEl.textContent='❌ Select a player'; return; }
+  if (!amount||amount<=0){ msgEl.style.color='var(--red)'; msgEl.textContent='❌ Enter a valid amount'; return; }
+  var user = allUsers.find(function(u){ return u.username===username; });
   if (!user) return;
-
-  const newBal = (user.balance || 0) + amount;
-  await dbUpdateUser(uid, { balance: newBal });
-  await dbLogActivity('admin', `Nitty gave ${amount} coins to ${user.username}`);
-
+  var newBal = (user.balance||0) + amount;
+  await dbUpdateUser(username, { balance: newBal });
+  await dbLogActivity('admin', 'Nitty gave ' + amount + ' coins to ' + username);
   msgEl.style.color = 'var(--green)';
-  msgEl.textContent = `✅ ${user.username} received ${amount} coins! New balance: ${newBal}`;
+  msgEl.textContent = '✅ ' + username + ' received ' + amount + ' coins! New balance: ' + newBal;
   document.getElementById('give-amount').value = '';
-  setTimeout(() => { msgEl.textContent=''; }, 3500);
+  setTimeout(function(){ msgEl.textContent=''; }, 3500);
   await loadAll();
-};
+}
 
-/* ── Reset Balance ─────────────────────────── */
-window.resetBalance = async function() {
-  const sel    = document.getElementById('reset-user');
-  const uid    = sel.value;
-  const amount = parseInt(document.getElementById('reset-amount').value, 10);
-  const msgEl  = document.getElementById('reset-msg');
+/* ── Reset balance ─────────────────────────── */
+async function resetBalance() {
+  var username = document.getElementById('reset-user').value;
+  var amount   = parseInt(document.getElementById('reset-amount').value, 10);
+  var msgEl    = document.getElementById('reset-msg');
   msgEl.textContent = '';
-
-  if (!uid)             { msgEl.style.color='var(--red)'; msgEl.textContent='❌ Select a player'; return; }
-  if (isNaN(amount) || amount<0) { msgEl.style.color='var(--red)'; msgEl.textContent='❌ Enter a valid balance'; return; }
-
-  const user = allUsers.find(u => u.uid === uid);
-  if (!user) return;
-  const old = user.balance;
-  await dbUpdateUser(uid, { balance: amount });
-  await dbLogActivity('admin', `Nitty reset ${user.username}'s balance: ${old} → ${amount}`);
-
+  if (!username)            { msgEl.style.color='var(--red)'; msgEl.textContent='❌ Select a player'; return; }
+  if (isNaN(amount)||amount<0){ msgEl.style.color='var(--red)'; msgEl.textContent='❌ Invalid amount'; return; }
+  await dbUpdateUser(username, { balance: amount });
+  await dbLogActivity('admin', 'Nitty reset ' + username + '\'s balance to ' + amount);
   msgEl.style.color = 'var(--green)';
-  msgEl.textContent = `✅ Balance set to ${amount} for ${user.username}`;
-  setTimeout(() => { msgEl.textContent=''; }, 3500);
+  msgEl.textContent = '✅ ' + username + '\'s balance set to ' + amount;
+  setTimeout(function(){ msgEl.textContent=''; }, 3500);
   await loadAll();
-};
+}
 
 /* ── Broadcast ─────────────────────────────── */
-window.broadcastMessage = async function() {
-  const msg    = document.getElementById('broadcast-msg').value.trim();
-  const statEl = document.getElementById('broadcast-status');
+async function broadcastMessage() {
+  var msg    = document.getElementById('broadcast-msg').value.trim();
+  var statEl = document.getElementById('broadcast-status');
   if (!msg) { statEl.style.color='var(--red)'; statEl.textContent='❌ Enter a message'; return; }
-
   await dbSetBroadcast(msg);
-  await dbLogActivity('admin', `Nitty broadcast: "${msg}"`);
-
+  await dbLogActivity('admin', 'Nitty broadcast: "' + msg + '"');
   statEl.style.color = 'var(--green)';
   statEl.textContent = '✅ Message sent to all players!';
   document.getElementById('broadcast-msg').value = '';
-  setTimeout(() => { statEl.textContent=''; }, 4000);
-};
-
-/* ── Activity Log ──────────────────────────── */
-function startActivityListener() {
-  unsubActivity = dbListenActivity(renderActivityLog);
+  setTimeout(function(){ statEl.textContent=''; }, 4000);
 }
 
+/* ── Activity log ──────────────────────────── */
 function renderActivityLog(log) {
-  const container = document.getElementById('activity-log');
+  var container = document.getElementById('activity-log');
   if (!container) return;
-
-  if (!log || log.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">No activity yet</p>';
-    return;
+  if (!log || !log.length) {
+    container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:16px">No activity yet</p>'; return;
   }
-
-  const icons = { win:'🏆', lose:'💸', register:'🆕', login:'👤', admin:'⚙️' };
-  container.innerHTML = log.map(item => `
-    <div class="activity-item type-${item.type}">
-      <span style="font-size:1.1rem">${icons[item.type] || '📋'}</span>
-      <span class="activity-text">${item.text}</span>
-      <span class="activity-time">${item.time}</span>
-    </div>
-  `).join('');
+  var icons = { win:'🏆', lose:'💸', register:'🆕', login:'👤', admin:'⚙️' };
+  container.innerHTML = log.map(function(item) {
+    return '<div class="activity-item type-' + item.type + '">' +
+      '<span style="font-size:1.1rem">' + (icons[item.type]||'📋') + '</span>' +
+      '<span class="activity-text">' + item.text + '</span>' +
+      '<span class="activity-time">' + item.time + '</span>' +
+      '</div>';
+  }).join('');
 }

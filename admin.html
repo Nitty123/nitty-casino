@@ -10,74 +10,47 @@
 
   <div class="stars"></div>
 
-  <!-- Navbar -->
   <nav class="navbar">
     <div class="nav-logo">🎰 <span>NITTY CASINO</span></div>
-    <div class="nav-center">
-      <span class="admin-badge">⚙️ ADMIN PANEL</span>
-    </div>
+    <div class="nav-center"><span class="admin-badge">⚙️ ADMIN PANEL</span></div>
     <div class="nav-right">
       <a href="casino.html" class="btn-logout">🎮 Back to Casino</a>
       <button onclick="logout()" class="btn-logout">🚪 Logout</button>
     </div>
   </nav>
 
-  <!-- Admin Main -->
   <main class="admin-main">
 
-    <!-- Stats Cards -->
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">👥</div>
-        <div class="stat-info">
-          <div class="stat-value" id="stat-users">—</div>
-          <div class="stat-label">Total Players</div>
-        </div>
+        <div class="stat-info"><div class="stat-value" id="stat-users">—</div><div class="stat-label">Total Players</div></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🃏</div>
-        <div class="stat-info">
-          <div class="stat-value" id="stat-games">—</div>
-          <div class="stat-label">Games Played</div>
-        </div>
+        <div class="stat-info"><div class="stat-value" id="stat-games">—</div><div class="stat-label">Games Played</div></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">💰</div>
-        <div class="stat-info">
-          <div class="stat-value" id="stat-coins">—</div>
-          <div class="stat-label">Coins in Circulation</div>
-        </div>
+        <div class="stat-info"><div class="stat-value" id="stat-coins">—</div><div class="stat-label">Coins in Circulation</div></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🏆</div>
-        <div class="stat-info">
-          <div class="stat-value" id="stat-top">—</div>
-          <div class="stat-label">Top Player</div>
-        </div>
+        <div class="stat-info"><div class="stat-value" id="stat-top">—</div><div class="stat-label">Top Player</div></div>
       </div>
     </div>
 
-    <!-- Admin Tools -->
     <div class="admin-grid">
 
-      <!-- Users Table -->
       <div class="admin-card full-width">
         <div class="admin-card-header">
           <h3>👥 Player Management</h3>
           <input type="text" id="user-search" placeholder="🔍 Search player..." oninput="filterUsers()" class="search-input"/>
         </div>
         <div class="table-wrapper">
-          <table class="admin-table" id="users-table">
+          <table class="admin-table">
             <thead>
-              <tr>
-                <th>#</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Balance</th>
-                <th>Games</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
+              <tr><th>#</th><th>Username</th><th>Email</th><th>Balance</th><th>Games</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody id="users-tbody">
               <tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:20px">Loading...</td></tr>
@@ -86,18 +59,16 @@
         </div>
       </div>
 
-      <!-- Give Coins -->
       <div class="admin-card">
         <h3>💰 Give Coins</h3>
         <div class="admin-form">
           <select id="give-user" class="admin-select"><option value="">— Select player —</option></select>
-          <input type="number" id="give-amount" placeholder="Amount of coins" min="1" class="admin-input"/>
+          <input type="number" id="give-amount" placeholder="Amount" min="1" class="admin-input"/>
           <button onclick="giveCoins()" class="btn-primary">💰 Give</button>
         </div>
         <div id="give-msg" class="success-msg"></div>
       </div>
 
-      <!-- Reset Balance -->
       <div class="admin-card">
         <h3>🔄 Reset Balance</h3>
         <div class="admin-form">
@@ -108,7 +79,6 @@
         <div id="reset-msg" class="success-msg"></div>
       </div>
 
-      <!-- Broadcast Message -->
       <div class="admin-card">
         <h3>📢 Broadcast Message</h3>
         <div class="admin-form">
@@ -118,18 +88,16 @@
         <div id="broadcast-status" class="success-msg"></div>
       </div>
 
-      <!-- Recent Activity -->
       <div class="admin-card full-width">
         <h3>📋 Recent Activity</h3>
         <div id="activity-log" class="activity-log">
-          <p style="color:var(--text-dim);text-align:center;padding:16px">Loading activity...</p>
+          <p style="color:var(--text-dim);text-align:center;padding:16px">Loading...</p>
         </div>
       </div>
 
     </div>
   </main>
 
-  <!-- Delete User Confirm Modal -->
   <div id="delete-modal" class="modal hidden">
     <div class="modal-overlay" onclick="cancelDelete()"></div>
     <div class="modal-content confirm-modal">
@@ -143,7 +111,10 @@
     </div>
   </div>
 
-  <script type="module" src="auth.js"></script>
-  <script type="module" src="admin.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase.js"></script>
+  <script src="auth.js"></script>
+  <script src="admin.js"></script>
 </body>
 </html>

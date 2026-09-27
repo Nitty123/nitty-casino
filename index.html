@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Nitty Casino</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body class="auth-page">
-
   <div class="stars"></div>
 
   <div class="auth-container">
@@ -17,13 +16,12 @@
       <p class="tagline">Fortune favors the bold</p>
     </div>
 
-    <!-- Tabs -->
     <div class="auth-tabs">
       <button class="tab-btn active" onclick="switchTab('login')">Login</button>
       <button class="tab-btn" onclick="switchTab('register')">Register</button>
     </div>
 
-    <!-- Login Form -->
+    <!-- LOGIN -->
     <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
       <div class="input-group">
         <span class="input-icon">👤</span>
@@ -37,19 +35,15 @@
       <button type="submit" class="btn-primary" id="login-btn">🎲 Enter Casino</button>
     </form>
 
-    <!-- Register Form -->
+    <!-- REGISTER -->
     <form id="register-form" class="auth-form hidden" onsubmit="handleRegister(event)">
       <div class="input-group">
         <span class="input-icon">👤</span>
         <input type="text" id="reg-username" placeholder="Choose a username" required autocomplete="off"/>
       </div>
       <div class="input-group">
-        <span class="input-icon">📧</span>
-        <input type="email" id="reg-email" placeholder="Email address" required autocomplete="email"/>
-      </div>
-      <div class="input-group">
         <span class="input-icon">🔒</span>
-        <input type="password" id="reg-password" placeholder="Password (min. 6 characters)" required minlength="6" autocomplete="new-password"/>
+        <input type="password" id="reg-password" placeholder="Password (min 6 chars)" required minlength="6" autocomplete="new-password"/>
       </div>
       <div class="input-group">
         <span class="input-icon">🔒</span>
@@ -63,6 +57,9 @@
     <p class="auth-footer">© 2026 Nitty Casino. All rights reserved.</p>
   </div>
 
-  <script type="module" src="auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>

@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Nitty Casino — Blackjack</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body class="game-page">
   <div class="stars"></div>
 
-  <!-- Navbar -->
   <nav class="navbar">
     <div class="nav-logo">🎰 <span>NITTY CASINO</span></div>
     <div class="nav-center">
@@ -25,7 +24,7 @@
 
   <main class="game-main">
 
-    <!-- ── MODE SELECTOR ── -->
+    <!-- MODE SELECT -->
     <div id="mode-screen">
       <div class="welcome-banner" style="margin-bottom:32px">
         <h2>🃏 <span style="color:var(--gold)">Blackjack</span></h2>
@@ -40,50 +39,45 @@
         <div class="mode-card" onclick="showMultiLobby()">
           <div class="mode-icon">👥</div>
           <div class="mode-name">MULTIPLAYER</div>
-          <div class="mode-desc">Create or join a room with real players</div>
+          <div class="mode-desc">Create or join a room</div>
         </div>
       </div>
     </div>
 
-    <!-- ── MULTIPLAYER LOBBY ── -->
+    <!-- MULTIPLAYER LOBBY -->
     <div id="multi-lobby" class="hidden">
       <div class="lobby-section">
         <div class="lobby-header">
           <h3>🃏 BLACKJACK ROOMS</h3>
           <button class="btn-secondary" onclick="showModeScreen()">← Back</button>
         </div>
-        <div class="rooms-list" id="bj-rooms-list">
-          <p class="no-rooms">No open rooms. Create one!</p>
-        </div>
+        <div class="rooms-list" id="bj-rooms-list"><p class="no-rooms">No open rooms.</p></div>
       </div>
       <div class="create-room-form">
         <h4>➕ CREATE ROOM</h4>
         <div class="form-row">
           <input type="number" id="bj-room-bet" class="form-input" placeholder="Bet amount (min 10)" min="10" value="50"/>
-          <button class="btn-primary" onclick="createMultiRoom()">🎮 Create Room</button>
+          <button class="btn-primary" onclick="createMultiRoom()">🎮 Create</button>
         </div>
         <div id="create-room-msg" class="error-msg" style="margin-top:8px"></div>
       </div>
     </div>
 
-    <!-- ── WAITING ROOM ── -->
+    <!-- WAITING ROOM -->
     <div id="waiting-room-screen" class="hidden">
       <div class="waiting-room">
         <h3>⏳ WAITING FOR PLAYERS</h3>
         <div class="room-id-display" id="room-id-display"></div>
-        <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">Share the Room ID with friends</p>
+        <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">Share Room ID with friends</p>
         <div class="players-waiting" id="waiting-players-list"></div>
-        <button id="start-multi-btn" class="btn-primary" style="margin-top:18px" onclick="startMultiGame()" disabled>
-          🎮 Start Game
-        </button>
+        <button id="start-multi-btn" class="btn-primary" style="margin-top:18px;width:100%" onclick="startMultiGame()" disabled>🎮 Start Game</button>
         <button class="btn-secondary" style="margin-top:10px;width:100%" onclick="leaveRoom()">Leave Room</button>
       </div>
     </div>
 
-    <!-- ── GAME TABLE ── -->
+    <!-- GAME TABLE -->
     <div id="game-screen" class="hidden">
 
-      <!-- Bet bar (solo only) -->
       <div class="bet-bar" id="bet-bar">
         <label>BET:</label>
         <div class="bet-chip chip-10"  onclick="addChip(10)">10</div>
@@ -95,43 +89,35 @@
         <button class="btn-clear-bet" onclick="clearBet()">✕ Clear</button>
       </div>
 
-      <!-- Table -->
       <div class="bj-table">
-
-        <!-- Dealer -->
         <div class="bj-area-label">DEALER</div>
         <div class="bj-hand" id="dealer-hand"></div>
         <div class="bj-score" id="dealer-score">—</div>
-
         <hr class="bj-divider"/>
-
-        <!-- Status -->
         <div class="bj-status" id="bj-status"></div>
-
         <hr class="bj-divider"/>
-
-        <!-- Player -->
         <div class="bj-score" id="player-score">—</div>
         <div class="bj-hand" id="player-hand"></div>
         <div class="bj-area-label">YOU</div>
       </div>
 
-      <!-- Controls -->
       <div class="bj-controls">
-        <button id="btn-deal"   class="bj-btn bj-btn-deal"   onclick="deal()">🃏 Deal</button>
-        <button id="btn-hit"    class="bj-btn bj-btn-hit"    onclick="hit()"    disabled>Hit</button>
-        <button id="btn-stand"  class="bj-btn bj-btn-stand"  onclick="stand()"  disabled>Stand</button>
-        <button id="btn-double" class="bj-btn bj-btn-double" onclick="doubleDown()" disabled>Double</button>
+        <button id="btn-deal"   class="bj-btn bj-btn-deal"   onclick="bjDeal()">🃏 Deal</button>
+        <button id="btn-hit"    class="bj-btn bj-btn-hit"    onclick="bjHit()"    disabled>Hit</button>
+        <button id="btn-stand"  class="bj-btn bj-btn-stand"  onclick="bjStand()"  disabled>Stand</button>
+        <button id="btn-double" class="bj-btn bj-btn-double" onclick="bjDouble()" disabled>Double</button>
       </div>
 
-      <div id="bj-result-msg" class="success-msg" style="text-align:center;font-size:1rem;min-height:24px"></div>
-
-      <button class="btn-secondary" style="display:block;margin:16px auto 0" onclick="backToModeScreen()">← Back to Menu</button>
+      <div id="bj-result-msg" style="text-align:center;font-size:1rem;min-height:24px;color:var(--gold);font-weight:700;margin-bottom:8px"></div>
+      <button class="btn-secondary" style="display:block;margin:10px auto 0" onclick="showModeScreen()">← Back to Menu</button>
     </div>
 
   </main>
 
-  <script type="module" src="auth.js"></script>
-  <script type="module" src="blackjack.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase.js"></script>
+  <script src="auth.js"></script>
+  <script src="blackjack.js"></script>
 </body>
 </html>
