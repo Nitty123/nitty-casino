@@ -46,7 +46,10 @@ function fbOnAuthChange(callback) {
 /* ─── User profile in DB ───────────────────────────────────────── */
 
 async function dbCreateUser(uid, data) {
-  return set(ref(db, `users/${uid}`), data);
+  // Write profile
+  await set(ref(db, `users/${uid}`), data);
+  // Write public username→email index (readable without auth for login lookup)
+  await set(ref(db, `usernames/${data.username.toLowerCase()}`), data.email);
 }
 
 async function dbGetUser(uid) {

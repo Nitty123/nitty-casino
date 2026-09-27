@@ -6,14 +6,15 @@ import {
   fbRegister, fbLogin, fbLogout, fbOnAuthChange,
   dbCreateUser, dbGetUser, dbGetUserByUsername,
   dbUpdateUser, dbLogActivity, dbListenLeaderboard,
-  dbSetBroadcast, dbListenBroadcast, dbSetOnline
+  dbSetBroadcast, dbListenBroadcast, dbSetOnline,
+  bjListenLobbies, pkListenLobbies
 } from './firebase.js';
 
-export const ADMIN_USERNAME  = 'Nitty';
+export const ADMIN_USERNAME   = 'Nitty';
 export const STARTING_BALANCE = 1000;
 
-/* ── current session state ─────────────────── */
-export let currentUser = null;   // { uid, username, email, balance, gamesPlayed, banned, isAdmin }
+/* ── Session state ─────────────────────────── */
+export let currentUser = null;
 export let currentUid  = null;
 
 /* ── Tab switching ─────────────────────────── */
@@ -51,9 +52,10 @@ window.handleRegister = async function(e) {
   const successEl = document.getElementById('register-success');
   const btn       = document.getElementById('register-btn');
 
-  errorEl.textContent = '';
+  errorEl.textContent  = '';
   successEl.textContent = '';
 
+  // Client-side validation
   if (username.length < 3) {
     errorEl.textContent = '❌ Username must be at least 3 characters'; return;
   }
@@ -63,20 +65,30 @@ window.handleRegister = async function(e) {
   if (password !== password2) {
     errorEl.textContent = '❌ Passwords do not match'; return;
   }
-
-  // Check username uniqueness
-  const existing = await dbGetUserByUsername(username);
-  if (existing) {
-    errorEl.textContent = '❌ Username already taken'; return;
+  if (password.length < 6) {
+    errorEl.textContent = '❌ Password must be at least 6 characters'; return;
   }
 
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = 'Creating account...';
 
   try {
+    // 1. Create Firebase Auth user first
     const cred = await fbRegister(email, password);
     const uid  = cred.user.uid;
 
+    // 2. Now we are authenticated — check username uniqueness via DB
+    const existing = await dbGetUserByUsername(username);
+    if (existing) {
+      // Username taken — delete the just-created auth user and bail
+      await cred.user.delete();
+      errorEl.textContent = '❌ Username already taken';
+      btn.disabled    = false;
+      btn.textContent = '🎉 Create Account';
+      return;
+    }
+
+    // 3. Write profile to Realtime DB
     const profile = {
       username,
       email,
@@ -90,11 +102,13 @@ window.handleRegister = async function(e) {
     await dbCreateUser(uid, profile);
     await dbLogActivity('register', `New player joined: ${username}`);
 
-    successEl.textContent = '✅ Account created! Redirecting...';
-    setTimeout(() => window.location.href = 'casino.html', 1400);
+    successEl.textContent = '✅ Account created! Entering casino...';
+    // onAuthStateChanged will fire and redirect automatically
+
   } catch (err) {
+    console.error('Register error:', err);
     errorEl.textContent = '❌ ' + friendlyError(err.code);
-    btn.disabled = false;
+    btn.disabled    = false;
     btn.textContent = '🎉 Create Account';
   }
 };
@@ -109,29 +123,40 @@ window.handleLogin = async function(e) {
   const btn           = document.getElementById('login-btn');
 
   errorEl.textContent = '';
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = 'Logging in...';
 
   try {
-    // Username → look up email in DB first
-    const profile = await dbGetUserByUsername(usernameInput);
-    if (!profile) {
+    // Step 1: sign in with a temp anonymous-like approach
+    // We need email for Firebase Auth — use a hidden lookup trick:
+    // Try to sign in with username@nitty-casino.placeholder and catch,
+    // OR we store a username→email index in DB readable without auth.
+    // Solution: we store emails in a public index node.
+    const email = await getUserEmail(usernameInput);
+    if (!email) {
       errorEl.textContent = '❌ User not found';
       btn.disabled = false; btn.textContent = '🎲 Enter Casino'; return;
     }
-    if (profile.banned) {
-      errorEl.textContent = '🚫 Your account has been banned';
-      btn.disabled = false; btn.textContent = '🎲 Enter Casino'; return;
-    }
 
-    await fbLogin(profile.email, password);
-    // onAuthStateChanged will fire and redirect
+    await fbLogin(email, password);
+    // onAuthStateChanged handles redirect
+
   } catch (err) {
+    console.error('Login error:', err);
     errorEl.textContent = '❌ ' + friendlyError(err.code);
-    btn.disabled = false;
+    btn.disabled    = false;
     btn.textContent = '🎲 Enter Casino';
   }
 };
+
+/* ── Get email from public username index ───── */
+async function getUserEmail(username) {
+  // We store a public username→email map that is readable without auth
+  const { db } = await import('./firebase.js');
+  const { get, ref } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
+  const snap = await get(ref(db, `usernames/${username.toLowerCase()}`));
+  return snap.exists() ? snap.val() : null;
+}
 
 /* ── Logout ────────────────────────────────── */
 window.logout = async function() {
@@ -143,24 +168,25 @@ window.logout = async function() {
 /* ── Error messages ─────────────────────────── */
 function friendlyError(code) {
   const map = {
-    'auth/email-already-in-use':  'Email already in use',
-    'auth/invalid-email':         'Invalid email address',
-    'auth/weak-password':         'Password is too weak',
-    'auth/user-not-found':        'Incorrect username or password',
-    'auth/wrong-password':        'Incorrect password',
-    'auth/too-many-requests':     'Too many attempts. Try again later',
-    'auth/network-request-failed':'Network error. Check your connection',
+    'auth/email-already-in-use':   'Email already in use',
+    'auth/invalid-email':          'Invalid email address',
+    'auth/weak-password':          'Password too weak (min 6 characters)',
+    'auth/user-not-found':         'Incorrect username or password',
+    'auth/wrong-password':         'Incorrect password',
+    'auth/invalid-credential':     'Incorrect username or password',
+    'auth/too-many-requests':      'Too many attempts. Try again later',
+    'auth/network-request-failed': 'Network error. Check your connection',
   };
-  return map[code] || 'Something went wrong. Please try again.';
+  return map[code] || `Something went wrong (${code})`;
 }
 
-/* ── Helper: refresh balance display ────────── */
+/* ── Refresh balance display ─────────────────── */
 export function refreshBalance(balance) {
   const el = document.getElementById('balance-amount');
   if (el) el.textContent = Number(balance).toLocaleString('en-US');
 }
 
-/* ── Helper: update user balance in DB ──────── */
+/* ── Update balance in DB ────────────────────── */
 export async function updateBalance(newBalance) {
   if (!currentUid) return;
   currentUser.balance = newBalance;
@@ -168,7 +194,7 @@ export async function updateBalance(newBalance) {
   refreshBalance(newBalance);
 }
 
-/* ── Helper: increment games played ─────────── */
+/* ── Increment games played ──────────────────── */
 export async function incrementGames() {
   if (!currentUid) return;
   const gp = (currentUser.gamesPlayed || 0) + 1;
@@ -176,7 +202,7 @@ export async function incrementGames() {
   await dbUpdateUser(currentUid, { gamesPlayed: gp });
 }
 
-/* ── Leaderboard builder ─────────────────────── */
+/* ── Leaderboard ─────────────────────────────── */
 function buildLeaderboard(users) {
   const container = document.getElementById('leaderboard');
   if (!container) return;
@@ -199,7 +225,7 @@ function buildLeaderboard(users) {
 /* ── System notification ────────────────────── */
 export function showNotification(message) {
   const area = document.getElementById('notification-area') || document.body;
-  const el = document.createElement('div');
+  const el   = document.createElement('div');
   el.className = 'system-notification';
   el.innerHTML = `
     <div class="notif-title">📢 SYSTEM MESSAGE</div>
@@ -215,7 +241,7 @@ export function coinAnimation() {
   for (let i = 0; i < 8; i++) {
     setTimeout(() => {
       const c = document.createElement('div');
-      c.className = 'coin-fly';
+      c.className  = 'coin-fly';
       c.textContent = '💰';
       c.style.left = (Math.random() * 80 + 10) + '%';
       c.style.top  = (Math.random() * 40 + 30) + '%';
@@ -230,17 +256,16 @@ fbOnAuthChange(async (firebaseUser) => {
   const path = window.location.pathname;
 
   if (!firebaseUser) {
-    // Not logged in
-    if (!path.endsWith('index.html') && path !== '/' && !path.endsWith('/')) {
-      window.location.href = 'index.html';
-    }
+    // Not logged in — redirect to index unless already there
+    const onIndex = path.endsWith('index.html') || path === '/' || path.endsWith('/');
+    if (!onIndex) window.location.href = 'index.html';
     return;
   }
 
-  // Load profile from DB
+  // Load profile
   const profile = await dbGetUser(firebaseUser.uid);
   if (!profile) {
-    // Profile missing — sign out
+    // Auth user exists but no DB profile — sign out
     await fbLogout();
     window.location.href = 'index.html';
     return;
@@ -256,27 +281,27 @@ fbOnAuthChange(async (firebaseUser) => {
   currentUid  = firebaseUser.uid;
   currentUser = { uid: firebaseUser.uid, ...profile };
 
-  // Set online presence
   dbSetOnline(currentUid);
 
-  // ── Index page: redirect to casino ──────────
-  if (path.endsWith('index.html') || path === '/' || path.endsWith('/')) {
+  // Index page → go to casino
+  const onIndex = path.endsWith('index.html') || path === '/' || path.endsWith('/');
+  if (onIndex) {
     window.location.href = 'casino.html';
     return;
   }
 
-  // ── Admin page: check permission ─────────────
+  // Admin page → check permission
   if (path.endsWith('admin.html') && !profile.isAdmin) {
     window.location.href = 'casino.html';
     return;
   }
 
-  // ── Casino page: init UI ──────────────────────
+  // Casino page → init UI
   if (path.endsWith('casino.html')) {
-    const navUser = document.getElementById('nav-username');
+    const navUser     = document.getElementById('nav-username');
     const welcomeName = document.getElementById('welcome-name');
-    if (navUser)    navUser.textContent    = '👤 ' + profile.username;
-    if (welcomeName) welcomeName.textContent = profile.username;
+    if (navUser)      navUser.textContent     = '👤 ' + profile.username;
+    if (welcomeName)  welcomeName.textContent  = profile.username;
     refreshBalance(profile.balance);
 
     if (profile.isAdmin) {
@@ -284,23 +309,17 @@ fbOnAuthChange(async (firebaseUser) => {
       if (adminLink) adminLink.classList.remove('hidden');
     }
 
-    // Live leaderboard
     dbListenLeaderboard(buildLeaderboard);
 
-    // Broadcast listener
     dbListenBroadcast((data) => {
-      if (data && data.ts && Date.now() - data.ts < 30000) {
-        showNotification(data.message);
-      }
+      if (data && data.ts && Date.now() - data.ts < 30000) showNotification(data.message);
     });
 
-    // Live player counts
     listenOnlineCounts();
-
     await dbLogActivity('login', `${profile.username} entered the casino`);
   }
 
-  // ── Game pages: set nav UI ────────────────────
+  // Game pages → init nav
   if (path.endsWith('blackjack.html') || path.endsWith('poker.html')) {
     const navUser = document.getElementById('nav-username');
     if (navUser) navUser.textContent = '👤 ' + profile.username;
@@ -313,9 +332,7 @@ fbOnAuthChange(async (firebaseUser) => {
   }
 });
 
-/* ── Live room counts on lobby page ─────────── */
-import { bjListenLobbies, pkListenLobbies } from './firebase.js';
-
+/* ── Live room counts ────────────────────────── */
 function listenOnlineCounts() {
   bjListenLobbies(rooms => {
     const el = document.getElementById('bj-online');
