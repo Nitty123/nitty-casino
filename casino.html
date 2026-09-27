@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nitty Casino — Lobby</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="casino-page">
+
+  <div class="stars"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-logo">🎰 <span>NITTY CASINO</span></div>
+    <div class="nav-center">
+      <div class="balance-display">
+        💰 Balance: <span id="balance-amount">0</span> coins
+      </div>
+    </div>
+    <div class="nav-right">
+      <span class="nav-username" id="nav-username"></span>
+      <a id="admin-link" href="admin.html" class="btn-admin hidden">⚙️ Admin</a>
+      <button onclick="logout()" class="btn-logout">🚪 Logout</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="casino-main">
+
+    <!-- Welcome Banner -->
+    <div class="welcome-banner">
+      <h2>Welcome back, <span id="welcome-name"></span>! 🎉</h2>
+      <p class="welcome-sub">Choose your game and test your luck</p>
+    </div>
+
+    <!-- Games Grid -->
+    <div class="games-section">
+      <h3 class="section-title">🎮 Games</h3>
+      <div class="games-grid">
+
+        <!-- Blackjack -->
+        <div class="game-card active-game" onclick="window.location.href='blackjack.html'">
+          <div class="game-icon">🃏</div>
+          <div class="game-name">Blackjack</div>
+          <div class="game-desc">Beat the dealer to 21</div>
+          <div class="game-meta">
+            <span class="game-players" id="bj-online">— online</span>
+          </div>
+          <div class="game-badge">PLAY</div>
+        </div>
+
+        <!-- Poker -->
+        <div class="game-card active-game" onclick="window.location.href='poker.html'">
+          <div class="game-icon">♠️</div>
+          <div class="game-name">Texas Hold'em</div>
+          <div class="game-desc">Multiplayer poker with bots</div>
+          <div class="game-meta">
+            <span class="game-players" id="pk-online">— online</span>
+          </div>
+          <div class="game-badge">PLAY</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="leaderboard-section">
+      <h3 class="section-title">🏆 Leaderboard</h3>
+      <div class="leaderboard" id="leaderboard">
+        <div class="lb-loading">Loading...</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- System notification -->
+  <div id="notification-area"></div>
+
+  <script type="module" src="auth.js"></script>
+</body>
+</html>
