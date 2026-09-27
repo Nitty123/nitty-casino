@@ -4,9 +4,8 @@
    ============================================= */
 
 var allUsers    = [];
-var deleteTarget = null; // username to delete
+var deleteTarget = null;
 
-/* ── Wait for auth to load ─────────────────── */
 var adminInitInterval = setInterval(function() {
   if (!currentUser) return;
   clearInterval(adminInitInterval);

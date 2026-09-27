@@ -29,7 +29,7 @@
       </div>
       <div class="input-group">
         <span class="input-icon">🔒</span>
-        <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password"/>
+        <input type="password" id="login-password" placeholder="Password" required/>
       </div>
       <div id="login-error" class="error-msg"></div>
       <button type="submit" class="btn-primary" id="login-btn">🎲 Enter Casino</button>
@@ -43,11 +43,11 @@
       </div>
       <div class="input-group">
         <span class="input-icon">🔒</span>
-        <input type="password" id="reg-password" placeholder="Password (min 6 chars)" required minlength="6" autocomplete="new-password"/>
+        <input type="password" id="reg-password" placeholder="Password (min 6 chars)" required minlength="6"/>
       </div>
       <div class="input-group">
         <span class="input-icon">🔒</span>
-        <input type="password" id="reg-password2" placeholder="Confirm password" required autocomplete="new-password"/>
+        <input type="password" id="reg-password2" placeholder="Confirm password" required/>
       </div>
       <div id="register-error" class="error-msg"></div>
       <div id="register-success" class="success-msg"></div>
@@ -57,9 +57,146 @@
     <p class="auth-footer">© 2026 Nitty Casino. All rights reserved.</p>
   </div>
 
+  <!-- Firebase v8 compat CDN -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="firebase.js"></script>
-  <script src="auth.js"></script>
+
+  <script>
+    // ── Init Firebase ──────────────────────────
+    var firebaseConfig = {
+      apiKey:            "AIzaSyC25opJgTxCJacH1r2gS9iaqfYHjGzADus",
+      authDomain:        "nitty-casino.firebaseapp.com",
+      databaseURL:       "https://nitty-casino-default-rtdb.firebaseio.com",
+      projectId:         "nitty-casino",
+      storageBucket:     "nitty-casino.firebasestorage.app",
+      messagingSenderId: "609501277778",
+      appId:             "1:609501277778:web:56871266b5a9a39cf7798b"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    var DB = firebase.database();
+
+    var ADMIN = 'Nitty';
+    var SESSION_KEY = 'nc_session';
+
+    // ── Password hash (djb2) ───────────────────
+    function hashPass(s) {
+      var h = 5381;
+      for (var i = 0; i < s.length; i++) { h = ((h << 5) + h) + s.charCodeAt(i); h = h & h; }
+      return (h >>> 0).toString(16);
+    }
+
+    // ── Tab switch ─────────────────────────────
+    function switchTab(tab) {
+      var lf = document.getElementById('login-form');
+      var rf = document.getElementById('register-form');
+      var tabs = document.querySelectorAll('.tab-btn');
+      if (tab === 'login') {
+        lf.classList.remove('hidden'); rf.classList.add('hidden');
+        tabs[0].classList.add('active'); tabs[1].classList.remove('active');
+      } else {
+        lf.classList.add('hidden'); rf.classList.remove('hidden');
+        tabs[0].classList.remove('active'); tabs[1].classList.add('active');
+      }
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('register-error').textContent = '';
+      document.getElementById('register-success').textContent = '';
+    }
+
+    // ── Register ───────────────────────────────
+    function handleRegister(e) {
+      e.preventDefault();
+      var username  = document.getElementById('reg-username').value.trim();
+      var password  = document.getElementById('reg-password').value;
+      var password2 = document.getElementById('reg-password2').value;
+      var errEl     = document.getElementById('register-error');
+      var okEl      = document.getElementById('register-success');
+      var btn       = document.getElementById('register-btn');
+
+      errEl.textContent = ''; okEl.textContent = '';
+
+      if (username.length < 3)               { errEl.textContent = '❌ Username min 3 chars'; return; }
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) { errEl.textContent = '❌ Letters, numbers, _ only'; return; }
+      if (password.length < 6)               { errEl.textContent = '❌ Password min 6 chars'; return; }
+      if (password !== password2)            { errEl.textContent = '❌ Passwords do not match'; return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      // Check if username exists
+      DB.ref('users/' + username.toLowerCase()).once('value').then(function(snap) {
+        if (snap.exists()) {
+          errEl.textContent = '❌ Username already taken';
+          btn.disabled = false; btn.textContent = '🎉 Create Account';
+          return;
+        }
+
+        // Save user
+        var profile = {
+          username:    username,
+          password:    hashPass(password),
+          balance:     1000,
+          gamesPlayed: 0,
+          banned:      false,
+          isAdmin:     username === ADMIN,
+          createdAt:   Date.now()
+        };
+
+        DB.ref('users/' + username.toLowerCase()).set(profile).then(function() {
+          okEl.textContent = '✅ Account created! Logging in...';
+          sessionStorage.setItem(SESSION_KEY, username);
+          setTimeout(function() { window.location.href = 'casino.html'; }, 1000);
+        }).catch(function(err) {
+          console.error('Write error:', err);
+          errEl.textContent = '❌ Save failed: ' + err.message;
+          btn.disabled = false; btn.textContent = '🎉 Create Account';
+        });
+
+      }).catch(function(err) {
+        console.error('Read error:', err);
+        errEl.textContent = '❌ Connection error: ' + err.message;
+        btn.disabled = false; btn.textContent = '🎉 Create Account';
+      });
+    }
+
+    // ── Login ──────────────────────────────────
+    function handleLogin(e) {
+      e.preventDefault();
+      var username = document.getElementById('login-username').value.trim();
+      var password = document.getElementById('login-password').value;
+      var errEl    = document.getElementById('login-error');
+      var btn      = document.getElementById('login-btn');
+
+      errEl.textContent = '';
+      btn.disabled = true; btn.textContent = 'Logging in...';
+
+      DB.ref('users/' + username.toLowerCase()).once('value').then(function(snap) {
+        if (!snap.exists()) {
+          errEl.textContent = '❌ User not found';
+          btn.disabled = false; btn.textContent = '🎲 Enter Casino'; return;
+        }
+        var profile = snap.val();
+        if (profile.password !== hashPass(password)) {
+          errEl.textContent = '❌ Wrong password';
+          btn.disabled = false; btn.textContent = '🎲 Enter Casino'; return;
+        }
+        if (profile.banned) {
+          errEl.textContent = '🚫 Account banned';
+          btn.disabled = false; btn.textContent = '🎲 Enter Casino'; return;
+        }
+        sessionStorage.setItem(SESSION_KEY, username);
+        window.location.href = 'casino.html';
+      }).catch(function(err) {
+        errEl.textContent = '❌ Error: ' + err.message;
+        btn.disabled = false; btn.textContent = '🎲 Enter Casino';
+      });
+    }
+
+    // ── Redirect if already logged in ─────────
+    window.addEventListener('load', function() {
+      if (sessionStorage.getItem(SESSION_KEY)) {
+        window.location.href = 'casino.html';
+      }
+    });
+  </script>
 </body>
 </html>
